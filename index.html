@@ -550,24 +550,37 @@ function playerSettings(){
 async function togglePlayerNotifications(){
  const p=currentPlayer();
  if(!p)return toast("Player not found.");
- const next=!p.notifications;
- const username=p.username||authUser?.username||p.name;
- p.notifications=next;
+
+ const username=(authUser&&authUser.username)?authUser.username:(p.username||p.name);
+ if(!username)return toast("Could not identify account username.");
+
+ const next=!(p.notifications===true);
+
  try{
-  if(onlineReady&&username){
-   const {error}=await supabaseClient.rpc("app_set_notifications_by_username",{
-    p_username:username,
-    p_enabled:next
-   });
-   if(error)throw error;
-  }
-  toast("Notifications turned "+(next?"on":"off")+".");
-  await dbLoad();
+  const rpcRes=await supabaseClient.rpc("app_set_notifications_by_username",{
+   p_username:username,
+   p_enabled:next
+  });
+  if(rpcRes.error)throw rpcRes.error;
+
+  const checkRes=await supabaseClient
+   .from("app_users")
+   .select("notifications_enabled")
+   .ilike("username",username)
+   .maybeSingle();
+
+  if(checkRes.error)throw checkRes.error;
+
+  const savedValue=checkRes.data?checkRes.data.notifications_enabled:next;
+  p.notifications=!!savedValue;
+
+  toast("Notifications turned "+(p.notifications?"on":"off")+".");
+  localStorage.setItem(storeKey,JSON.stringify(state));
   render();
  }catch(e){
-  console.error(e);
-  p.notifications=!next;
+  console.error("Notification toggle failed",e);
   toast("Could not save notification setting: "+(e.message||"unknown error"));
+  await dbLoad();
   render();
  }
 }
@@ -1171,7 +1184,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=8").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=9").catch(console.error));
 }
 
 boot();
