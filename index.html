@@ -503,9 +503,10 @@ function playerHall(){const r=defendingChampion(),champ=state.players.find(p=>p.
 function rules(){return `<div class="card"><div class="card-head"><strong>Competition Info</strong></div><div class="card-body list"><div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div><div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div></div></div><div class="card"><div class="card-head"><strong>Rules</strong></div><div class="card-body"><p style="line-height:1.55;margin:0">${state.rules}</p></div></div>`}
 function playerSettings(){
  const p=currentPlayer();
+ const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
  return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
    <label>Display Name</label><input id="playerUsername" value="${p.name}">
-   <label style="margin-top:12px">PIN / Password</label><input id="playerPin" type="password" value="${p.pin||""}">
+   ${isAdminPlayer?`<div class="notice" style="margin-top:12px">This is also the administrator account, so password changes are managed from the admin side only.</div>`:`<label style="margin-top:12px">Password</label><input id="playerPin" type="password" value="${p.pin||""}">`}
    <br><br><button onclick="savePlayerAccount()">Save Account</button>
  </div></div>
 
@@ -778,17 +779,24 @@ function savePlayerAccount(){
  const p=currentPlayer();
  const oldName=p.name;
  const newName=document.getElementById("playerUsername").value.trim();
- const newPin=document.getElementById("playerPin").value.trim();
- if(!newName||!newPin)return toast("Display name and password are required.");
+ const pinEl=document.getElementById("playerPin");
+ const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
+ const newPin=pinEl?pinEl.value.trim():"";
+ if(!newName)return toast("Display name is required.");
+ if(!isAdminPlayer&&!newPin)return toast("Password is required.");
  if(state.players.some(x=>x!==p&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
  p.name=newName;
- p.pin=newPin;
+ if(!isAdminPlayer)p.pin=newPin;
  state.selectedPlayer=newName;
  if(authUser&&authUser.role==="player"&&authUser.name===oldName){
   authUser.name=newName;
   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
  }
- toast("Account updated.");
+ if(authUser&&authUser.role==="admin"&&authUser.name===oldName){
+  authUser.name=newName;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ }
+ toast(isAdminPlayer?"Display name updated. Admin password unchanged.":"Account updated.");
  save();
 }
 function saveNotificationMessages(){
