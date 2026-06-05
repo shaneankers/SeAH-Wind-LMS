@@ -17,7 +17,7 @@ self.addEventListener('push',event=>{
   event.waitUntil(self.registration.showNotification(data.title||'SêAH Wind LMS',{
     body:data.body||'You have a new update.',
     icon:'icon-192.png',
-    badge:'icon-192.png',
+    badge:'badge-icon.png',
     data:data.url||'./'
   }));
 });
