@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SeAH Wind LMS</title>
+<meta name="theme-color" content="#f97316"/>
+<style>
+:root{
+  --bg:#0f172a;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e5e7eb;
+  --orange:#f97316;--orange2:#ea580c;--yellow:#fbbf24;--red:#dc2626;--green:#16a34a;
+  --shadow:0 24px 60px rgba(0,0,0,.25);--radius:22px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at 20% 0%,rgba(249,115,22,.32),transparent 32%),radial-gradient(circle at 80% 8%,rgba(251,191,36,.22),transparent 28%),linear-gradient(135deg,#0f172a,#111827 55%,#020617);color:var(--ink);min-height:100vh}
+.app{max-width:1180px;margin:auto;padding:20px}
+.header{display:flex;align-items:center;gap:13px;color:white;margin-bottom:18px}
+.logo{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--orange),var(--yellow));display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;box-shadow:0 18px 45px rgba(249,115,22,.38);line-height:.9}
+.logo-main{font-size:22px;font-weight:1000;letter-spacing:-1px}.logo-sub{font-size:13px;font-weight:1000;letter-spacing:-.7px;white-space:nowrap}
+h1{font-size:28px;margin:0;letter-spacing:-.04em}.sub{font-size:14px;color:#fed7aa;margin:4px 0 0}
+.shell{display:grid;grid-template-columns:250px 1fr;gap:18px}
+.sidebar,.main,.login-wrap{background:rgba(255,255,255,.98);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.sidebar{padding:16px;height:max-content}.profile{border:1px solid var(--line);border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#f8fafc);margin-bottom:14px}.profile strong{font-size:17px}
+.sidebar.player-mode .profile{background:linear-gradient(135deg,var(--orange),var(--yellow));border:0;color:white;text-align:center}
+.sidebar.player-mode .profile strong{font-size:30px;display:block;font-weight:1000;letter-spacing:-.04em}.sidebar.player-mode .profile .tiny{display:none}
+.tiny{font-size:12px;color:var(--muted)}.muted{font-size:14px;color:var(--muted)}
+.nav{display:flex;flex-direction:column;gap:8px}.nav button{background:#1f2937;color:#dbe3f5;text-align:left}.nav button.active{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827}
+button{border:0;border-radius:14px;padding:11px 14px;font-weight:900;cursor:pointer;background:var(--orange);color:white;transition:.15s ease}
+button:hover{background:var(--orange2);transform:translateY(-1px)}button.secondary{background:#334155}button.yellow{background:var(--yellow);color:#111827}button.red{background:var(--red)}button.green{background:var(--green)}button.ghost{background:#fff7ed;color:#9a3412}button.small{padding:8px 10px;border-radius:11px;font-size:12px}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.mode-switch button{background:#1f2937;color:#dbe3f5}.mode-switch button.active{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827}
+.logout-btn{width:100%;margin-top:12px;background:#1f2937;color:#dbe3f5}
+.topline{padding:18px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fafc)}
+.title{font-size:21px;font-weight:1000;margin:0;letter-spacing:-.03em}.body{padding:20px}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#e2e8f0;color:#334155;white-space:nowrap}.badge.orange{background:#ffedd5;color:#9a3412}.badge.yellow{background:#fef3c7;color:#78350f}.badge.green{background:#dcfce7;color:#166534}.badge.red{background:#fee2e2;color:#991b1b}.badge.dark{background:#1f2937;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.stat{border:1px solid var(--line);border-radius:18px;background:#fff;padding:15px}.stat .label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:1000}.stat .value{font-size:28px;font-weight:1000;letter-spacing:-.05em}
+.card{border:1px solid var(--line);border-radius:20px;background:white;overflow:hidden;margin-bottom:14px}.card-head{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.card-head strong{font-size:16px}.card-body{padding:16px}.list{display:flex;flex-direction:column;gap:10px}
+.item,.admin-row,.compact-player{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.item-title,.admin-row-title{font-weight:950}.admin-row-detail,.compact-detail{font-size:12px;color:var(--muted);margin-top:2px}.actions{display:flex;flex-wrap:wrap;gap:8px}
+.admin-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.admin-action-grid button{width:100%}
+.round-row{display:grid;grid-template-columns:1fr;gap:10px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px}.round-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;padding:11px 12px;font:inherit;background:white;color:var(--ink);outline:none}input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(249,115,22,.16)}label{font-size:12px;font-weight:950;color:#334155;display:block;margin-bottom:6px}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.notice{border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:18px;padding:14px;line-height:1.45}
+.comp-header{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827;border-radius:22px;padding:18px;margin-bottom:16px}.comp-header h2{margin:0 0 6px;font-size:24px;letter-spacing:-.04em}.comp-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.compact-player{display:grid;grid-template-columns:1fr auto}.compact-name{font-weight:950}.compact-status{font-size:12px;font-weight:950;border-radius:999px;padding:5px 8px}.compact-status.ok{background:#dcfce7;color:#166534}.compact-status.wait{background:#fef3c7;color:#78350f}.compact-status.out{background:#fee2e2;color:#991b1b}
+.install-button{width:100%;padding:15px;border-radius:18px;background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827;font-size:16px}.confirmed-btn{background:var(--green)!important;color:white!important;cursor:default!important}
+.login-wrap{max-width:460px;margin:40px auto}.login-hero{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827;padding:24px;text-align:center}.big-logo{width:84px;height:84px;margin:0 auto 14px;border-radius:26px;background:rgba(255,255,255,.18);display:flex;flex-direction:column;justify-content:center;align-items:center;color:white}.big-logo .logo-main{font-size:30px}.big-logo .logo-sub{font-size:17px}.login-body{padding:20px}.login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}.login-tabs button{background:#f1f5f9;color:#334155}.login-tabs button.active{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827}.remember-row{display:flex;gap:10px;align-items:center;margin:12px 0;color:#334155;font-weight:800}.remember-row input{width:auto}
+.toast{position:fixed;right:18px;bottom:18px;background:#111827;color:white;padding:13px 16px;border-radius:15px;box-shadow:0 20px 45px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:.2s;max-width:340px;z-index:60}.toast.show{opacity:1;transform:translateY(0)}
+
+.compact-table{display:flex;flex-direction:column;gap:8px}
+.compact-admin-row{display:grid;grid-template-columns:1.2fr 2fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px}
+.status-pills{display:flex;gap:6px;flex-wrap:wrap}
+.compact-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.compact-round-row{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:10px;align-items:end;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px}
+.stats.five{grid-template-columns:repeat(5,1fr)}
+.notification-editor{display:grid;grid-template-columns:1fr;gap:12px}
+
+.player-list-row{display:grid;grid-template-columns:1.2fr auto auto auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px}
+.player-list-name{font-weight:950;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player-edit-panel{grid-column:1/-1;display:none;background:#f8fafc;border-radius:12px;padding:10px;margin-top:6px}
+.player-edit-panel.open{display:flex;gap:8px;flex-wrap:wrap}
+.round-compact-row{display:grid;grid-template-columns:1.1fr 1fr .7fr;gap:8px;align-items:end;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px}
+.round-name{font-weight:950}
+.round-sub{font-size:12px;color:var(--muted)}
+
+.round-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+
+.player-list-row.tight{grid-template-columns:minmax(90px,1.4fr) auto auto auto 42px}
+.player-list-row.tight .small.edit-only{padding:6px 8px;font-size:11px;border-radius:9px;min-width:38px}
+.player-list-row.tight .player-edit-panel{grid-column:1/-1}
+.round-compact-row.clean{grid-template-columns:minmax(100px,1fr) minmax(110px,1fr) minmax(95px,.65fr)}
+
+.player-list-name{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.player-list-row.tight{
+  grid-template-columns:minmax(0,1.6fr) auto auto auto 42px;
+}
+@media(max-width:520px){
+ .player-list-row.tight{
+   grid-template-columns:minmax(0,1fr) auto 42px;
+ }
+ .player-list-row.tight .badge:nth-of-type(2){
+   display:none;
+ }
+ .player-list-row.tight .badge:nth-of-type(3){
+   display:none;
+ }
+}
+
+@media(max-width:700px){
+ .player-list-row.tight{grid-template-columns:1fr auto auto auto 42px}
+ .round-compact-row.clean{grid-template-columns:1fr 1fr}
+ .round-compact-row.clean .round-person{grid-column:1/-1}
+}
+
+@media(max-width:700px){
+ .player-list-row{grid-template-columns:1fr auto;gap:8px}
+ .player-list-row .hide-mobile{display:none}
+ .player-edit-panel.open{display:flex}
+ .round-compact-row{grid-template-columns:1fr 1fr}
+ .round-compact-row .round-person{grid-column:1/-1}
+}
+
+@media(max-width:900px){
+ .compact-admin-row{grid-template-columns:1fr}
+ .compact-actions{justify-content:flex-start}
+ .compact-round-row{grid-template-columns:1fr}
+ .stats.five{grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:900px){.shell{grid-template-columns:1fr}.stats,.formrow,.round-controls{grid-template-columns:1fr}.header{align-items:flex-start}.admin-row{display:block}.admin-row .actions{margin-top:10px}}
+@media(max-width:520px){.app{padding:13px}.body{padding:15px}.topline{padding:15px}h1{font-size:23px}.stats{grid-template-columns:1fr 1fr}}
+
+/* FINAL compact admin player rows */
+.player-list-row.status-line{
+  display:grid !important;
+  grid-template-columns:minmax(82px,1fr) auto auto auto 38px !important;
+  gap:6px !important;
+  align-items:center !important;
+  padding:8px 9px !important;
+}
+.player-list-row.status-line .player-list-name{
+  min-width:0 !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+  font-size:15px !important;
+  font-weight:950 !important;
+}
+.player-list-row.status-line .badge{
+  display:inline-flex !important;
+  font-size:10px !important;
+  padding:4px 6px !important;
+  border-radius:999px !important;
+}
+.player-list-row.status-line .edit-only{
+  padding:5px 6px !important;
+  font-size:10px !important;
+  min-width:34px !important;
+  border-radius:9px !important;
+}
+.player-edit-panel{grid-column:1/-1}
+
+/* FINAL compact round rows */
+.round-compact-row.final-round{
+  display:grid !important;
+  grid-template-columns:minmax(85px,.85fr) minmax(145px,1.45fr) minmax(64px,.45fr) !important;
+  gap:8px !important;
+  align-items:end !important;
+  padding:9px 10px !important;
+}
+.round-compact-row.final-round .round-name{
+  font-size:15px !important;
+  font-weight:950 !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+}
+.round-compact-row.final-round label{
+  font-size:11px !important;
+  margin-bottom:4px !important;
+}
+.round-compact-row.final-round select{
+  padding:9px 9px !important;
+  border-radius:12px !important;
+  font-size:15px !important;
+}
+.round-deadline-badge::before{
+  content:"Round Deadline: ";
+}
+@media(max-width:520px){
+  .player-list-row.status-line{
+    grid-template-columns:minmax(72px,1fr) auto auto auto 34px !important;
+    gap:4px !important;
+  }
+  .player-list-row.status-line .badge{
+    font-size:9px !important;
+    padding:4px 5px !important;
+  }
+  .round-compact-row.final-round{
+    grid-template-columns:minmax(72px,.8fr) minmax(130px,1.55fr) minmax(58px,.45fr) !important;
+    gap:6px !important;
+  }
+}
+
+
+/* Round tab refined: bigger team dropdown, smaller text result dropdown */
+.round-compact-row.final-round{
+  grid-template-columns:minmax(95px,.8fr) minmax(190px,1.7fr) minmax(115px,.75fr) !important;
+}
+.round-compact-row.final-round select{
+  font-size:15px !important;
+}
+@media(max-width:520px){
+ .round-compact-row.final-round{
+   grid-template-columns:minmax(70px,.7fr) minmax(150px,1.8fr) minmax(92px,.75fr) !important;
+ }
+}
+
+
+/* Corrected Round layout: name full width, controls underneath 80/20 */
+.round-compact-row.final-correct{
+  display:block !important;
+  padding:10px 12px !important;
+}
+.round-compact-row.final-correct .round-name{
+  font-size:16px !important;
+  font-weight:950 !important;
+  margin-bottom:8px !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+}
+.round-controls-8020{
+  display:grid !important;
+  grid-template-columns:4fr 1fr !important;
+  gap:8px !important;
+  align-items:end !important;
+}
+.round-controls-8020 label{
+  font-size:11px !important;
+  margin-bottom:4px !important;
+}
+.round-controls-8020 select{
+  font-size:15px !important;
+  padding:9px 9px !important;
+  border-radius:12px !important;
+}
+.round-deadline-badge::before{
+  content:"Deadline: " !important;
+}
+@media(max-width:520px){
+  .round-controls-8020{
+    grid-template-columns:4fr 1fr !important;
+    gap:6px !important;
+  }
+  .round-controls-8020 select{
+    font-size:14px !important;
+    padding:8px 7px !important;
+  }
+}
+
+
+.team-manager{display:grid;grid-template-columns:1fr;gap:12px}
+.league-box{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff}
+.league-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.team-chip-list{display:flex;flex-wrap:wrap;gap:7px}
+.team-chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#f1f5f9;color:#334155;font-weight:900;font-size:12px;padding:7px 9px}
+.team-chip button{padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;line-height:1}
+.add-team-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.placeholder-box{display:none;margin-top:10px}
+.placeholder-box.open{display:block}
+.pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.pick-grid{grid-template-columns:1fr}}
+
+/* edit panel safety */
+.player-edit-panel{grid-column:1/-1}
+.player-edit-panel.open{display:flex!important;gap:8px;flex-wrap:wrap}
+.round-controls-8020 select option[value="win"]{color:#16a34a;font-weight:900}
+.round-controls-8020 select option[value="lose"]{color:#dc2626;font-weight:900}
+
+.sidebar.admin-mode .profile{
+  background:linear-gradient(135deg,#fbbf24,#fde047);
+  border:0;
+  color:#111827;
+  text-align:center;
+}
+.sidebar.admin-mode .profile strong{
+  font-size:30px;
+  display:block;
+  font-weight:1000;
+  letter-spacing:-.04em;
+}
+.sidebar.admin-mode .profile .tiny{
+  display:none;
+}
+.auth-link{
+  background:transparent!important;
+  color:#9a3412!important;
+  padding:10px 0!important;
+  width:100%;
+  text-align:center;
+  box-shadow:none!important;
+}
+
+</style>
+</head>
+<body>
+<div id="loginScreen"></div>
+<div class="app" id="appScreen" style="display:none">
+<header class="header"><div class="logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><div><h1>SeAH Wind LMS</h1><p class="sub">Last Man Standing</p></div></header>
+<div class="shell"><aside class="sidebar"><div class="profile"><strong id="sideTitle">Admin</strong><div class="tiny" id="sideSub"></div></div><div class="nav" id="nav"></div></aside><main class="main"><div class="topline"><p class="title" id="pageTitle">Dashboard</p><div class="muted" id="pageSub">Competition #1 · Rollover 0 · Round 1</div></div><div class="body" id="content"></div></main></div>
+</div>
+<div id="toast" class="toast"></div>
+<div id="renameModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.72);align-items:center;justify-content:center;padding:18px;z-index:85">
+  <div style="background:white;border-radius:22px;max-width:420px;width:100%;padding:18px;box-shadow:var(--shadow)">
+    <h3 style="margin:0 0 10px">Rename Player</h3>
+    <input id="renameInput" placeholder="Enter new display name">
+    <input id="renameIndex" type="hidden">
+    <div class="actions" style="margin-top:12px">
+      <button onclick="saveRenamePlayer()">Save</button>
+      <button class="secondary" onclick="closeRenameModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="copyModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.72);align-items:center;justify-content:center;padding:18px;z-index:80">
+  <div style="background:white;border-radius:22px;max-width:440px;width:100%;padding:18px;box-shadow:var(--shadow)">
+    <h3 style="margin:0 0 10px">Copy Invite Message</h3>
+    <textarea id="copyText" rows="5" style="width:100%"></textarea>
+    <div class="actions" style="margin-top:12px">
+      <button onclick="manualCopy()">Copy</button>
+      <button class="secondary" onclick="closeCopyModal()">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+const storeKey="seah_wind_lms_release_candidate_1";
+let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
+ competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
+ rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
+ notifications:{
+  unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",
+  missingPick:"Pick reminder: you have not selected your team for SeAH Wind LMS Round {round}. Please submit your pick before {deadline}.",
+  winner:"Winner announcement: {winner} has won SeAH Wind LMS Competition #{competition}.",
+  rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."
+ },
+ teams:["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham","Leeds","Sunderland","Birmingham","Coventry","Ipswich","Leicester","Middlesbrough","Southampton"],
+ leagues:{
+  "Premier League":["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham"],
+  "Championship":["Birmingham","Coventry","Ipswich","Leicester","Middlesbrough","Southampton"],
+  "League One":[],
+  "League Two":[]
+ },
+ players:[],champions:[]
+};
+let authUser=JSON.parse(localStorage.getItem("seah_auth_user_current")||"null"),loginMode="login",role="admin",page="dashboard",adminView=localStorage.getItem("seah_admin_view_current")||"admin";
+function save(){localStorage.setItem(storeKey,JSON.stringify(state));render()}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
+function paid(){return state.players.filter(p=>p.paid&&p.approved)}
+function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive)}
+function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
+function pot(){return (state.potCarryover||0)+(paid().length*state.entryFee)}
+function currentPlayer(){return state.players.find(p=>p.name===state.selectedPlayer)||state.players[0]||{name:"",approved:false,paid:false,alive:true,wins:0,pick:"",locked:false,previous:[]}}
+function defendingChampion(){return state.champions.length?state.champions[state.champions.length-1].name:"None"}
+function stars(n){return n?"⭐".repeat(n):""}
+function displayName(p){return `${defendingChampion()===p.name?"🏆 ":""}${p.name} ${stars(p.wins)}`.trim()}
+function ensureLeagues(){
+ if(!state.leagues){
+  state.leagues={"Premier League":[...state.teams],"Championship":[],"League One":[],"League Two":[]};
+ }
+ state.teams=Object.values(state.leagues).flat();
+}
+function leagueKeys(){ensureLeagues();return Object.keys(state.leagues);}
+function teamLeague(team){
+ ensureLeagues();
+ return leagueKeys().find(l=>state.leagues[l].includes(team))||leagueKeys()[0];
+}
+function noteTextRaw(key){
+ if(!state.notifications){state.notifications={unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",missingPick:"Pick reminder: you have not selected your team for SeAH Wind LMS Round {round}. Please submit your pick before {deadline}.",winner:"Winner announcement: {winner} has won SeAH Wind LMS Competition #{competition}.",rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."};}
+ return state.notifications[key]||"";
+}
+function noteText(key, extra={}){
+ if(!state.notifications){
+  state.notifications={unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",missingPick:"Pick reminder: you have not selected your team for SeAH Wind LMS Round {round}. Please submit your pick before {deadline}.",winner:"Winner announcement: {winner} has won SeAH Wind LMS Competition #{competition}.",rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."};
+ }
+ const data={entryFee:state.entryFee,round:state.round,deadline:state.deadline,competition:state.competition,winner:extra.winner||defendingChampion()};
+ return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
+}
+function renderAuth(){
+ const login=document.getElementById("loginScreen"),app=document.getElementById("appScreen");
+ if(authUser){
+  login.style.display="none";app.style.display="block";
+  if(authUser.role==="admin"){const adminPlayer=ensureAdminPlayer();role=adminView;if(role==="player"){state.selectedPlayer=adminPlayer.name;if(["dashboard","players","round","settings"].includes(page))page="myPick"}else{if(["myPick","previous","competition","playerHall","rules","playerSettings"].includes(page))page="dashboard"}}
+  else{role="player";state.selectedPlayer=authUser.name;if(page==="dashboard")page="myPick"}
+  return true
+ }
+ app.style.display="none";login.style.display="block";
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${loginMode==='login'?`<label>Username</label><input id="loginName" placeholder="Enter username"><label style="margin-top:12px">Password</label><input id="loginPin" type="password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" placeholder="Choose username"><label style="margin-top:12px">Password</label><input id="createPin" type="password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ return false
+}
+function loginAdmin(){const u=prompt("Admin username:");if(u===null)return;const p=prompt("Admin password:");if(p===null)return;if(u!==state.adminUsername||p!==state.adminPassword)return toast("Incorrect admin login.");authUser={name:state.adminUsername,role:"admin"};localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));adminView="admin";localStorage.setItem("seah_admin_view_current",adminView);page="dashboard";render()}
+function loginUser(){
+ const name=document.getElementById("loginName").value.trim();
+ const pin=document.getElementById("loginPin").value.trim();
+ const remember=document.getElementById("rememberMe").checked;
+
+ if(name===state.adminUsername && pin===state.adminPassword){
+  authUser={name:state.adminUsername,role:"admin"};
+  if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  adminView="admin";
+  localStorage.setItem("seah_admin_view_current",adminView);
+  page="dashboard";
+  
+render();
+  return;
+ }
+
+ const p=state.players.find(x=>x.name.toLowerCase()===name.toLowerCase()&&x.pin===pin);
+ if(!p)return toast("Account not found.");
+ authUser={name:p.name,role:"player"};
+ if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ page="myPick";
+ render();
+}
+function createAccount(){
+ const name=document.getElementById("createName").value.trim();
+ const pin=document.getElementById("createPin").value.trim();
+ const confirmPin=document.getElementById("createPinConfirm").value.trim();
+ const code=document.getElementById("joinCode").value.trim();
+ const remember=document.getElementById("createRemember").checked;
+ if(!name||!pin)return toast("Enter a username and password.");
+ if(pin!==confirmPin)return toast("Passwords do not match.");
+ if(code!==state.joinCode)return toast("Join code is incorrect.");
+ if(state.players.some(p=>p.name.toLowerCase()===name.toLowerCase()))return toast("Username already exists.");
+ state.players.push({name,pin,approved:false,paid:false,alive:true,wins:0,pick:"",locked:false,result:"pending",previous:[],outRound:null,outPick:null,notifications:true});
+ authUser={name,role:"player"};
+ if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ save();
+ page="myPick";
+ render();
+}
+function logout(){authUser=null;localStorage.removeItem("seah_auth_user_current");page="dashboard";renderAuth()}
+function ensureAdminPlayer(){
+ let p=state.players.find(x=>x.adminPlayer===true);
+ if(!p){
+  p=state.players.find(x=>x.name===authUser.name);
+  if(p) p.adminPlayer=true;
+ }
+ if(!p){
+  state.players.unshift({name:authUser.name,pin:"admin",approved:true,paid:true,alive:true,wins:0,pick:"",locked:false,result:"pending",previous:[],outRound:null,outPick:null,notifications:true,adminPlayer:true});
+  p=state.players[0];
+ }
+ p.approved=true;
+ if(typeof p.paid==="undefined") p.paid=true;
+ if(typeof p.notifications==="undefined") p.notifications=true;
+ return p;
+}
+function switchAdminView(view){
+ adminView=view;
+ localStorage.setItem("seah_admin_view_current",view);
+ role=view;
+ if(view==="player"){
+  const adminPlayer=ensureAdminPlayer();
+  state.selectedPlayer=adminPlayer.name;
+ }
+ page=view==="admin"?"dashboard":"myPick";
+ render();
+}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function render(){
+ ensureLeagues();
+ state.players.forEach(p=>{
+  if(p.locked && !p.pick) p.locked=false;
+  if(typeof p.notifications==="undefined") p.notifications=true;
+ });
+ if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
+function setPage(p){page=p;render()}
+function dashboard(){const pending=state.players.filter(p=>!p.approved),unpaid=state.players.filter(p=>p.approved&&!p.paid),missing=alive().filter(p=>!p.pick);return `<div class="stats"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(p=>p.approved).length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Needs Attention</strong></div><div class="card-body list"><div class="item"><div><div class="item-title">Pending Approval</div><div class="tiny">${pending.map(p=>p.name).join(", ")||"None"}</div></div><div class="actions"><span class="badge yellow">${pending.length}</span><button class="small" onclick="setPage('players')" ${pending.length?'':'disabled'}>Review</button></div></div><div class="item"><div><div class="item-title">Unpaid Players</div><div class="tiny">${unpaid.map(p=>p.name).join(", ")||"Everyone has paid"}</div></div><div class="actions"><span class="badge yellow">${unpaid.length}</span><button class="small" onclick="notifyUnpaid()" ${unpaid.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Missing Picks</div><div class="tiny">${missing.map(p=>p.name).join(", ")||"Everyone has picked"}</div></div><div class="actions"><span class="badge orange">${missing.length}</span><button class="small" onclick="notifyMissingPicks()" ${missing.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Announcements</div><div class="tiny">Send winner or rollover updates</div></div><div class="admin-action-grid"><button class="small green" onclick="notifyWinner()">Winner</button><button class="small yellow" onclick="notifyRollover()">Rollover</button></div></div>
+
+</div></div>`}
+function players(){
+ const pending=state.players.filter(p=>!p.approved), approved=state.players.filter(p=>p.approved);
+ return `<div class="card">
+   <div class="card-head"><strong>Pending Players</strong><span class="badge yellow">${pending.length}</span></div>
+   <div class="card-body list">
+     ${pending.length?pending.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row">
+       <div class="player-list-name">${p.name}</div>
+       <span class="badge yellow">Pending</span>
+       <button class="small green" onclick="approvePlayer(${i})">Approve</button>
+       <button class="small yellow" onclick="approveAndPay(${i})">Approve + Paid</button>
+       <button class="small red" onclick="rejectPlayer(${i})">Reject</button>
+     </div>`}).join(""):`<div class="notice">No pending players.</div>`}
+   </div>
+ </div>
+
+ <div class="card">
+   <div class="card-head"><strong>Players</strong><span class="badge orange">${approved.length}</span></div>
+   <div class="card-body list">
+     ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
+       <div class="player-list-name" title="${displayName(p)}">${displayName(p)}</div>
+       <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
+       <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
+       <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
+       <button class="small edit-only" onclick="toggleEditPanel(${i})">Edit</button>
+       <div id="edit-${i}" class="player-edit-panel">
+         <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
+         <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
+         <button class="small secondary" onclick="renamePlayer(${i})">Rename</button>
+         <button class="small red" onclick="rejectPlayer(${i})">Remove</button>
+       </div>
+     </div>`}).join(""):`<div class="notice">No approved players yet.</div>`}
+   </div>
+ </div>`;
+}
+function round(){
+ return `<div class="card">
+   <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
+   <div class="card-body list">
+     ${alive().map(p=>{const i=state.players.indexOf(p);return `<div class="round-compact-row final-correct">
+       <div class="round-name" title="${displayName(p)}">${displayName(p)}</div>
+       <div class="round-controls-8020">
+         <div><label>Team</label><select onchange="setPick(${i},this.value)"><option value="">Not picked</option>${state.teams.map(t=>`<option value="${t}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${t}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
+         <div><label>Result</label><select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select></div>
+       </div>
+     </div>`}).join("")||`<div class="notice">No alive players.</div>`}
+   </div>
+ </div>
+ <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="ghost" onclick="nextRoundOnly()">Next Round</button></div>`;
+}
+function myPick(){const p=currentPlayer(),selected=window.tempPick||p.pick||"";if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;return `<div class="stats five"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(x=>x.approved).length}</div></div><div class="stat"><div class="label">Remaining</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${p.alive?'Yes':'No'}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Player Dashboard</strong></div><div class="card-body list"><div class="item"><div class="item-title">Payment</div><span class="badge ${p.paid?'green':'red'}">${p.paid?'Paid':'Not Paid'}</span></div><div class="item"><div class="item-title">Team Selection</div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Team Selected':'Awaiting Selection'}</span></div></div></div><div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body"><div class="item" style="margin-bottom:12px"><div><div class="item-title">Current Pick</div><div class="tiny">${p.pick||"No team selected"}</div></div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Submitted':'Not Submitted'}</span></div>${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}<div class="pick-grid">
+  <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
+  <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${state.leagues[window.tempLeague||teamLeague(selected)].map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
+</div>${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}<br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button></div></div>`}
+function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${t}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
+function competition(){return `<div class="comp-header"><h2>Competition #${state.competition}</h2><div>Rollover ${state.rollover||0} · Round ${state.round} · Prize Pot £${pot()}</div><div class="comp-meta"><span class="badge dark">${alive().length} standing</span><span class="badge dark">${out().length} eliminated</span></div></div><div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${alive().length}</span></div><div class="card-body list">${alive().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div><div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${out().length}</span></div><div class="card-body list">${out().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`}
+function playerHall(){const r=defendingChampion(),champ=state.players.find(p=>p.name===r);return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">🏆 ${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${state.champions.length?state.champions.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">🏆 ${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`}
+function rules(){return `<div class="card"><div class="card-head"><strong>Competition Info</strong></div><div class="card-body list"><div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div><div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div></div></div><div class="card"><div class="card-head"><strong>Rules</strong></div><div class="card-body"><p style="line-height:1.55;margin:0">${state.rules}</p></div></div>`}
+function playerSettings(){
+ const p=currentPlayer();
+ return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
+   <label>Display Name</label><input id="playerUsername" value="${p.name}">
+   <label style="margin-top:12px">PIN / Password</label><input id="playerPin" type="password" value="${p.pin||""}">
+   <br><br><button onclick="savePlayerAccount()">Save Account</button>
+ </div></div>
+
+ <div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body">
+   <div class="item">
+     <div><div class="item-title">Mobile Push Notifications</div><div class="tiny">${p.notifications?'Enabled':'Disabled'}</div></div>
+     <button class="small ${p.notifications?'green':'red'}" onclick="togglePlayerNotifications()">${p.notifications?'On':'Off'}</button>
+   </div>
+   <div class="tiny" style="margin-top:10px">Mobile push notifications will work once the app is hosted as a live PWA.</div>
+ </div></div>
+
+ <div class="card"><div class="card-head"><strong>Add App</strong></div><div class="card-body">
+   <button class="install-button" onclick="addAppGuide()">📲 Add App to Home Screen</button>
+   <div id="installHelp" class="notice" style="display:none;margin-top:12px">Use your browser menu and choose <strong>Add to Home Screen</strong>. The automatic install prompt can be added once the app is hosted.</div>
+ </div></div>`;
+}
+
+function togglePlayerNotifications(){
+ const p=currentPlayer();
+ p.notifications=!p.notifications;
+ toast("Notifications turned "+(p.notifications?"on":"off")+".");
+ save();
+}
+
+function addAppGuide(){
+ const el=document.getElementById("installHelp");
+ if(el)el.style.display=el.style.display==="none"?"block":"none";
+}
+
+function settings(){ensureLeagues();return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${state.adminUsername}"><label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value="${state.adminPassword}"><br><br><button onclick="saveAdminAccount()">Save Admin Login</button></div></div>
+
+<div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body"><div class="item"><div><div class="item-title">${state.joinCode}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div><br><button onclick="copyInvite()">Copy Invite Message</button></div></div>
+
+<div class="card"><div class="card-head"><strong>Competition</strong></div><div class="card-body"><div class="formrow"><div><label>Entry fee</label><input id="entryFee" type="number" value="${state.entryFee}"></div><div><label>Deadline</label><input id="deadline" value="${state.deadline}"></div></div><label>Rules</label><textarea id="rulesText" rows="5">${state.rules}</textarea><br><br><button onclick="saveSettings()">Save</button></div></div>
+
+<div class="card"><div class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
+  <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${noteTextRaw('unpaid')}</textarea></div>
+  <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${noteTextRaw('missingPick')}</textarea></div>
+  <div><label>Winner announcement</label><textarea id="noteWinner" rows="3">${noteTextRaw('winner')}</textarea></div>
+  <div><label>Rollover announcement</label><textarea id="noteRollover" rows="3">${noteTextRaw('rollover')}</textarea></div>
+  <button onclick="saveNotificationMessages()">Save Notification Messages</button>
+  <button class="ghost" onclick="togglePlaceholders()">ⓘ Available placeholders</button>
+  <div id="placeholderBox" class="placeholder-box notice">{entryFee}, {round}, {deadline}, {competition}, {winner}</div>
+</div></div>
+
+<div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
+  ${leagueKeys().map(league=>`<div class="league-box">
+    <div class="league-head"><strong>${league}</strong><span class="badge">${state.leagues[league].length}</span></div>
+    <div class="team-chip-list">
+      ${state.leagues[league].map(team=>`<span class="team-chip">${team}<button onclick="removeTeam('${league.replace(/'/g,"\\'")}','${team.replace(/'/g,"\\'")}')">×</button></span>`).join("") || `<div class="tiny">No teams added yet.</div>`}
+    </div>
+    <div class="add-team-row"><input id="add-${league.replace(/\s/g,'-')}" placeholder="Add team to ${league}"><button class="small" onclick="addTeam('${league.replace(/'/g,"\\'")}')">Add</button></div>
+  </div>`).join("")}
+</div></div>`}
+function togglePlaceholders(){
+ const el=document.getElementById("placeholderBox");
+ if(el) el.classList.toggle("open");
+}
+function addTeam(league){
+ ensureLeagues();
+ const input=document.getElementById("add-"+league.replace(/\s/g,'-'));
+ const name=(input?.value||"").trim();
+ if(!name)return toast("Enter a team name.");
+ if(state.teams.some(t=>t.toLowerCase()===name.toLowerCase()))return toast("Team already exists.");
+ state.leagues[league].push(name);
+ state.teams=Object.values(state.leagues).flat();
+ input.value="";
+ toast(name+" added.");
+ save();
+}
+function removeTeam(league,team){
+ ensureLeagues();
+ if(!confirm("Remove "+team+"?"))return;
+ state.leagues[league]=state.leagues[league].filter(t=>t!==team);
+ state.teams=Object.values(state.leagues).flat();
+ toast(team+" removed.");
+ save();
+}
+function selectPickLeague(v){
+ window.tempLeague=v;
+ window.tempPick="";
+ render();
+}
+function toggleEditPanel(i){
+ const el=document.getElementById("edit-"+i);
+ if(!el){
+  toast("Edit options not found.");
+  return;
+ }
+ el.classList.toggle("open");
+}
+
+function approvePlayer(i){state.players[i].approved=true;toast(state.players[i].name+" approved.");save()}
+function approveAndPay(i){state.players[i].approved=true;state.players[i].paid=true;toast(state.players[i].name+" approved and marked paid.");save()}
+function rejectPlayer(i){if(confirm("Remove this player?")){state.players.splice(i,1);save()}}
+function togglePaid(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ p.paid=!p.paid;
+ toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
+ save();
+}
+function unlockPick(i){state.players[i].locked=false;toast(state.players[i].name+"'s pick unlocked.");save()}
+function renamePlayer(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ const modal=document.getElementById("renameModal");
+ const input=document.getElementById("renameInput");
+ const index=document.getElementById("renameIndex");
+ if(index)index.value=i;
+ if(input){
+  input.value=p.name;
+  setTimeout(()=>{input.focus();input.select();},50);
+ }
+ if(modal)modal.style.display="flex";
+}
+
+function closeRenameModal(){
+ const modal=document.getElementById("renameModal");
+ if(modal)modal.style.display="none";
+}
+
+function saveRenamePlayer(){
+ const indexEl=document.getElementById("renameIndex");
+ const input=document.getElementById("renameInput");
+ const i=Number(indexEl?.value);
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ const newName=(input?.value||"").trim();
+ if(!newName)return toast("Enter a display name.");
+ if(state.players.some((x,idx)=>idx!==i&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
+ const oldName=p.name;
+ p.name=newName;
+ if(state.selectedPlayer===oldName)state.selectedPlayer=newName;
+ if(authUser&&authUser.role==="player"&&authUser.name===oldName){
+  authUser.name=newName;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ }
+ closeRenameModal();
+ toast(oldName+" renamed to "+newName+".");
+ save();
+}
+
+
+function setPick(i,v){state.players[i].pick=v;save()}
+function setResult(i,v){state.players[i].result=v;save()}
+function chooseTempPick(v){window.tempPick=v;render()}
+function confirmPlayerPick(){
+ const p=currentPlayer();
+ const pick=(window.tempPick||"").trim();
+ if(!pick){
+  p.locked=false;
+  return toast("Choose a team first.");
+ }
+ if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
+ p.pick=pick;
+ p.locked=true;
+ window.tempPick="";
+ toast("Pick submitted and locked.");
+ save();
+}
+function processRound(){
+ const pending=alive().filter(p=>p.result==="pending");
+ if(pending.length){
+  toast("Mark result for: "+pending.map(p=>p.name).join(", "));
+  return;
+ }
+
+ const teamResults={};
+ const conflicts=[];
+
+ alive().forEach(p=>{
+  if(!p.pick)return;
+  if(!teamResults[p.pick]){
+   teamResults[p.pick]=p.result;
+  }else if(teamResults[p.pick]!==p.result){
+   conflicts.push(p.pick);
+  }
+ });
+
+ if(conflicts.length){
+  toast("Result mismatch for: "+[...new Set(conflicts)].join(", "));
+  return;
+ }
+
+ const before=alive().length;
+
+ alive().forEach(p=>{
+  if(p.pick&&!p.previous.includes(p.pick))p.previous.push(p.pick);
+
+  if(!p.pick||p.result==="lose"){
+   p.alive=false;
+   p.outRound=state.round;
+   p.outPick=p.pick||"No Pick";
+  }
+
+  p.pick="";
+  p.locked=false;
+  p.result="pending";
+ });
+
+ const s=alive();
+
+ if(s.length===1){
+  s[0].wins++;
+  state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
+  toast("Winner: "+s[0].name);
+  page="playerHall";
+ }else if(s.length===0&&before>0){
+  state.potCarryover=(state.potCarryover||0)+(paid().length*state.entryFee);
+  state.rollover=(state.rollover||0)+1;
+  state.round++;
+  state.players.filter(p=>p.approved).forEach(p=>{
+   p.alive=true;
+   p.paid=false;
+   p.outRound=null;
+   p.outPick=null;
+   p.pick="";
+   p.locked=false;
+   p.result="pending";
+  });
+  toast("Rollover "+state.rollover+" started. Everyone is back in and payment is due again.");
+ }else{
+  state.round++;
+  toast("Round processed.");
+ }
+
+ save();
+}
+function nextRoundOnly(){state.round++;save()}
+function startNextCompetition(){state.competition++;state.rollover=0;state.potCarryover=0;state.round=1;state.players.filter(p=>p.approved&&p.paid).forEach(p=>{p.alive=true;p.pick="";p.locked=false;p.result="pending";p.previous=[];p.outRound=null;p.outPick=null});page="dashboard";toast("Competition #"+state.competition+" started.");save()}
+function saveSettings(){state.entryFee=Number(document.getElementById("entryFee").value||5);state.deadline=document.getElementById("deadline").value.trim();state.rules=document.getElementById("rulesText").value.trim();save()}
+function saveTeams(){state.teams=document.getElementById("teamsText").value.split("\n").map(x=>x.trim()).filter(Boolean);save()}
+function saveAdminAccount(){state.adminUsername=document.getElementById("adminUsername").value.trim();state.adminPassword=document.getElementById("adminPassword").value.trim();authUser.name=state.adminUsername;localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));save()}
+function savePlayerAccount(){
+ const p=currentPlayer();
+ const oldName=p.name;
+ const newName=document.getElementById("playerUsername").value.trim();
+ const newPin=document.getElementById("playerPin").value.trim();
+ if(!newName||!newPin)return toast("Display name and password are required.");
+ if(state.players.some(x=>x!==p&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
+ p.name=newName;
+ p.pin=newPin;
+ state.selectedPlayer=newName;
+ if(authUser&&authUser.role==="player"&&authUser.name===oldName){
+  authUser.name=newName;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ }
+ toast("Account updated.");
+ save();
+}
+function saveNotificationMessages(){
+ state.notifications={
+  unpaid:document.getElementById("noteUnpaid").value,
+  missingPick:document.getElementById("noteMissing").value,
+  winner:document.getElementById("noteWinner").value,
+  rollover:document.getElementById("noteRollover").value
+ };
+ toast("Notification messages saved.");
+ save();
+}
+function changeJoinCode(){const c=prompt("Enter new join code",state.joinCode);if(c){state.joinCode=c.trim();save()}}
+function copyInvite(){
+ const msg="Join SeAH Wind LMS\\nCreate your account using join code: "+state.joinCode;
+ showCopyModal(msg);
+}
+
+function showCopyModal(msg){
+ const modal=document.getElementById("copyModal");
+ const txt=document.getElementById("copyText");
+ if(txt)txt.value=msg.replace(/\\n/g,"\n");
+ if(modal)modal.style.display="flex";
+ toast("Invite message ready to copy.");
+}
+
+function closeCopyModal(){
+ const modal=document.getElementById("copyModal");
+ if(modal)modal.style.display="none";
+}
+
+function manualCopy(){
+ const txt=document.getElementById("copyText");
+ if(!txt)return;
+ txt.focus();
+ txt.select();
+ txt.setSelectionRange(0,99999);
+ try{
+  document.execCommand("copy");
+  toast("Invite copied.");
+ }catch(e){
+  toast("Select the invite text and copy it manually.");
+ }
+}
+function notifyUnpaid(){navigator.clipboard&&navigator.clipboard.writeText(noteText("unpaid"));toast("Payment reminder copied/sent.")}
+function notifyMissingPicks(){navigator.clipboard&&navigator.clipboard.writeText(noteText("missingPick"));toast("Pick reminder copied/sent.")}
+function notifyWinner(){navigator.clipboard&&navigator.clipboard.writeText(noteText("winner"));toast("Winner announcement copied/sent.")}
+function notifyRollover(){navigator.clipboard&&navigator.clipboard.writeText(noteText("rollover"));toast("Rollover announcement copied/sent.")}
+
+render();
+</script>
+</body>
+</html>
