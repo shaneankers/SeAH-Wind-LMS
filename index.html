@@ -351,6 +351,7 @@ const SUPABASE_PUBLISHABLE_KEY="sb_publishable_eTGcnIkUzl_ypR4CiXl9dw_3BJGsWjL";
 const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let onlineReady=false;
 let currentUserId=null;
+const VAPID_PUBLIC_KEY="BDiQg7Dv-rC208qxVoXfllO5_Fyjygvo9Cr7lpK57KwPKZaGUL2Zl_LBLq6WyPKaW3zbkzJ8Asa-pjHyssiNel4";
 
 const storeKey="seah_wind_lms_live_supabase_v15";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
@@ -546,7 +547,7 @@ function playerSettings(){
      <div><div class="item-title">Mobile Push Notifications</div><div class="tiny">${p.notifications?'Enabled':'Disabled'}</div></div>
      <button class="small ${p.notifications?'green':'red'}" onclick="togglePlayerNotifications()">${p.notifications?'On':'Off'}</button>
    </div>
-   <div class="tiny" style="margin-top:10px">This saves your notification preference. Real phone alerts will be enabled in the next notification update.</div>
+   <div class="tiny" style="margin-top:10px">Turn this on to allow this device to receive SêAH Wind LMS push notifications.</div>
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Install App</strong></div><div class="card-body">
@@ -554,6 +555,77 @@ function playerSettings(){
    <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install SêAH Wind LMS:</strong><br>Android/Chrome: tap <strong>Install app</strong> if shown, or open the browser menu ⋮ and choose <strong>Add to Home screen</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.<br><br>Once installed, the app will open more like a normal mobile app.</div>
  </div></div>`;
 }
+
+
+function urlBase64ToUint8Array(base64String){
+ const padding="=".repeat((4-base64String.length%4)%4);
+ const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+ const rawData=window.atob(base64);
+ const outputArray=new Uint8Array(rawData.length);
+ for(let i=0;i<rawData.length;++i){outputArray[i]=rawData.charCodeAt(i);}
+ return outputArray;
+}
+
+async function registerPushSubscription(){
+ if(!("Notification" in window))throw new Error("Notifications are not supported on this device/browser.");
+ if(!("serviceWorker" in navigator))throw new Error("Service workers are not supported on this device/browser.");
+ if(!("PushManager" in window))throw new Error("Push notifications are not supported on this device/browser.");
+
+ let permission=Notification.permission;
+ if(permission==="default"){
+  permission=await Notification.requestPermission();
+ }
+ if(permission!=="granted")throw new Error("Notification permission was not granted.");
+
+ const registration=await navigator.serviceWorker.register("sw.js?v=16");
+ await navigator.serviceWorker.ready;
+
+ let subscription=await registration.pushManager.getSubscription();
+ if(!subscription){
+  subscription=await registration.pushManager.subscribe({
+   userVisibleOnly:true,
+   applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+ }
+
+ const p=currentPlayer();
+ const userId=(authUser&&authUser.user_id)||p.id;
+ if(!userId)throw new Error("Could not identify logged-in user.");
+
+ const subJson=subscription.toJSON();
+ const endpoint=subJson.endpoint;
+ const deviceLabel=(navigator.userAgent||"Device").slice(0,180);
+
+ const {error}=await supabaseClient
+  .from("push_subscriptions")
+  .upsert({
+   user_id:userId,
+   endpoint:endpoint,
+   subscription:subJson,
+   device_label:deviceLabel,
+   updated_at:new Date().toISOString()
+  },{onConflict:"endpoint"});
+
+ if(error)throw error;
+ return true;
+}
+
+async function unregisterPushSubscription(){
+ try{
+  if(!("serviceWorker" in navigator))return;
+  const registration=await navigator.serviceWorker.getRegistration();
+  if(!registration)return;
+  const subscription=await registration.pushManager.getSubscription();
+  if(subscription){
+   const endpoint=subscription.endpoint;
+   await subscription.unsubscribe();
+   await supabaseClient.from("push_subscriptions").delete().eq("endpoint",endpoint);
+  }
+ }catch(e){
+  console.warn("Could not remove push subscription",e);
+ }
+}
+
 
 async function togglePlayerNotifications(){
  const p=currentPlayer();
@@ -565,6 +637,13 @@ async function togglePlayerNotifications(){
  const next=!(p.notifications===true);
 
  try{
+  if(next){
+   toast("Requesting notification permission...");
+   await registerPushSubscription();
+  }else{
+   await unregisterPushSubscription();
+  }
+
   const rpcRes=await supabaseClient.rpc("app_set_notifications_by_username",{
    p_username:username,
    p_enabled:next
@@ -586,12 +665,12 @@ async function togglePlayerNotifications(){
    localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   }
 
-  toast("Notifications turned "+(p.notifications?"on":"off")+".");
+  toast(p.notifications?"Notifications enabled on this device.":"Notifications turned off.");
   localStorage.setItem(storeKey,JSON.stringify(state));
   render();
  }catch(e){
   console.error("Notification toggle failed",e);
-  toast("Could not save notification setting: "+(e.message||"unknown error"));
+  toast("Could not enable notifications: "+(e.message||"unknown error"));
   await dbLoad();
   render();
  }
@@ -1211,7 +1290,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=11").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=16").catch(console.error));
 }
 
 boot();
