@@ -541,9 +541,9 @@ function playerSettings(){
    <div class="tiny" style="margin-top:10px">Mobile push notifications will work once the app is hosted as a live PWA.</div>
  </div></div>
 
- <div class="card"><div class="card-head"><strong>Add App</strong></div><div class="card-body">
-   <button class="install-button" onclick="addAppGuide()">📲 Add App to Home Screen</button>
-   <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install help:</strong><br>Android/Chrome: tap the browser menu ⋮ and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.<br><br>If an install prompt is available, this button will open it automatically.</div>
+ <div class="card"><div class="card-head"><strong>Install App</strong></div><div class="card-body">
+   <button class="install-button" onclick="addAppGuide()">📲 Install SêAH Wind LMS</button>
+   <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install SêAH Wind LMS:</strong><br>Android/Chrome: tap <strong>Install app</strong> if shown, or open the browser menu ⋮ and choose <strong>Add to Home screen</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.<br><br>Once installed, the app will open more like a normal mobile app.</div>
  </div></div>`;
 }
 
@@ -1153,7 +1153,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=5").catch(console.error));
 }
 
 boot();
