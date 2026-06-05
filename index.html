@@ -298,19 +298,21 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 .admin-alert strong{display:block;font-size:16px;margin-bottom:4px;color:#9a3412}
 
 
-.task-row{
-  border:1px solid var(--line);
-  border-radius:16px;
-  background:#fff;
-  padding:13px;
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  align-items:flex-start;
+.reset-required-box{
+  max-width:460px;
+  margin:40px auto;
+  background:white;
+  border-radius:22px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
 }
-.task-title{font-weight:1000;color:#0f172a}
-.task-detail{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.35}
-.task-meta{font-size:11px;color:#94a3b8;margin-top:6px}
+.reset-required-head{
+  background:linear-gradient(135deg,var(--orange),var(--yellow));
+  color:#111827;
+  padding:22px;
+  text-align:center;
+}
+.reset-required-body{padding:20px}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -404,6 +406,12 @@ function noteText(key, extra={}){
 }
 function renderAuth(){
  const login=document.getElementById("loginScreen"),app=document.getElementById("appScreen");
+ if(authUser&&authUser.must_reset_password){
+  app.style.display="none";
+  login.style.display="block";
+  login.innerHTML=`<div class="reset-required-box"><div class="reset-required-head"><h1 style="margin:0">Password Reset Required</h1><div class="sub" style="color:#431407">Your password was reset by the administrator.</div></div><div class="reset-required-body"><label>New Password</label><input id="forcedNewPassword" type="password" placeholder="Enter new password"><label style="margin-top:12px">Confirm Password</label><input id="forcedConfirmPassword" type="password" placeholder="Confirm new password"><br><br><button class="install-button" onclick="completeForcedPasswordReset()">Save Password</button><button class="logout-btn" onclick="logout()">Logout</button></div></div>`;
+  return false;
+ }
  if(authUser){
   login.style.display="none";app.style.display="block";
   if(authUser.role==="admin"){const adminPlayer=ensureAdminPlayer();role=adminView;if(role==="player"){state.selectedPlayer=adminPlayer.name;if(["dashboard","players","round","settings"].includes(page))page="myPick"}else{if(["myPick","previous","competition","playerHall","rules","playerSettings"].includes(page))page="dashboard"}}
@@ -443,18 +451,18 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["adminTasks","🧾 Admin Tasks"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
- if(!state.adminAlerts)state.adminAlerts=[]; if(!state.adminTasks)state.adminTasks=[];
+ if(!state.adminAlerts)state.adminAlerts=[];
  state.players.forEach(p=>{
   if(p.locked && !p.pick) p.locked=false;
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
- if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,adminTasks,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
+ if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
 function setPage(p){page=p;render()}
-function dismissAdminAlert(i){if(!state.adminAlerts)state.adminAlerts=[]; if(!state.adminTasks)state.adminTasks=[];state.adminAlerts.splice(i,1);save()}
-function addAdminAlert(title,message){if(!state.adminAlerts)state.adminAlerts=[]; if(!state.adminTasks)state.adminTasks=[];state.adminAlerts.unshift({title,message,created:new Date().toISOString()});}
+function dismissAdminAlert(i){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.splice(i,1);save()}
+function addAdminAlert(title,message){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.unshift({title,message,created:new Date().toISOString()});}
 function dashboard(){const pending=state.players.filter(p=>!p.approved),unpaid=state.players.filter(p=>p.approved&&!p.paid),missing=alive().filter(p=>!p.pick);const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");return `${alerts}<div class="stats"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(p=>p.approved).length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Needs Attention</strong></div><div class="card-body list"><div class="item"><div><div class="item-title">Pending Approval</div><div class="tiny">${pending.map(p=>p.name).join(", ")||"None"}</div></div><div class="actions"><span class="badge yellow">${pending.length}</span><button class="small" onclick="setPage('players')" ${pending.length?'':'disabled'}>Review</button></div></div><div class="item"><div><div class="item-title">Unpaid Players</div><div class="tiny">${unpaid.map(p=>p.name).join(", ")||"Everyone has paid"}</div></div><div class="actions"><span class="badge yellow">${unpaid.length}</span><button class="small" onclick="notifyUnpaid()" ${unpaid.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Missing Picks</div><div class="tiny">${missing.map(p=>p.name).join(", ")||"Everyone has picked"}</div></div><div class="actions"><span class="badge orange">${missing.length}</span><button class="small" onclick="notifyMissingPicks()" ${missing.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Announcements</div><div class="tiny">Send winner or rollover updates</div></div><div class="admin-action-grid"><button class="small green" onclick="notifyWinner()">Winner</button><button class="small yellow" onclick="notifyRollover()">Rollover</button></div></div>
 
 </div></div>`}
@@ -556,20 +564,6 @@ function addAppGuide(){
  }
  const el=document.getElementById("installHelp");
  if(el)el.style.display=el.style.display==="none"?"block":"none";
-}
-
-
-function adminTasks(){
- const tasks=state.adminTasks||[];
- const open=tasks.filter(t=>!t.done);
- const done=tasks.filter(t=>t.done);
- return `<div class="stats"><div class="stat"><div class="label">Open Tasks</div><div class="value">${open.length}</div></div><div class="stat"><div class="label">Completed</div><div class="value">${done.length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div>
- <div class="card"><div class="card-head"><strong>Open Admin Tasks</strong><span class="badge yellow">${open.length}</span></div><div class="card-body list">
- ${tasks.length?tasks.map((t,i)=>!t.done?`<div class="task-row"><div><div class="task-title">${t.title}</div><div class="task-detail">${t.detail}</div><div class="task-meta">${t.created?new Date(t.created).toLocaleString():""}</div></div><div class="actions"><button class="small green" onclick="completeAdminTask(${i})">Done</button><button class="small red" onclick="deleteAdminTask(${i})">Delete</button></div></div>`:"").join("")||`<div class="notice">No open admin tasks.</div>`:`<div class="notice">No admin tasks yet. Winner and rollover tasks will appear here automatically.</div>`}
- </div></div>
- <div class="card"><div class="card-head"><strong>Completed Tasks</strong><span class="badge green">${done.length}</span></div><div class="card-body list">
- ${tasks.map((t,i)=>t.done?`<div class="task-row" style="opacity:.72"><div><div class="task-title">✓ ${t.title}</div><div class="task-detail">${t.detail}</div><div class="task-meta">${t.created?new Date(t.created).toLocaleString():""}</div></div><button class="small red" onclick="deleteAdminTask(${i})">Delete</button></div>`:"").join("")||`<div class="notice">No completed tasks yet.</div>`}
- </div></div>`;
 }
 
 function settings(){ensureLeagues();return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${state.adminUsername}"><label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value="${state.adminPassword}"><br><br><button onclick="saveAdminAccount()">Save Admin Login</button></div></div>
@@ -702,7 +696,7 @@ async function resetPlayerPassword(i){
   });
   if(error)throw error;
   toast("Password reset for "+p.name+".");
-  addAdminAlert("Password reset",p.name+" now has a temporary password. Tell them to log in and change it.");
+  addAdminAlert("Password reset",p.name+" now has a temporary password. They will be forced to change it on next login.");
   save();
  }catch(e){
   console.error(e);
@@ -772,8 +766,7 @@ function processRound(){
  if(s.length===1){
   s[0].wins++;
   state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
-  addAdminAlert("Winner found","Winner: "+s[0].name+". Sort the prize money and then start the next competition when ready.");
-  addAdminTask("Pay winner","Winner: "+s[0].name+". Prize pot is £"+pot()+". Sort the prize money, then start the next competition when ready.","winner");
+  addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
   alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
   toast("Winner: "+s[0].name);
   page="playerHall";
@@ -790,8 +783,7 @@ function processRound(){
    p.locked=false;
    p.result="pending";
   });
-  addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Everyone is back in and payment is due again.");
-  addAdminTask("Collect rollover payments","Rollover "+state.rollover+" has started. Everyone who is back in needs to pay £"+state.entryFee+" again. Current pot carryover is £"+(state.potCarryover||0)+".","rollover");
+  addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Admin action needed: send rollover notification and collect payment again from everyone who is back in.");
   alert("Rollover started.\n\nAdmin action needed: collect payment again from everyone who is back in.");
   toast("Rollover "+state.rollover+" started. Everyone is back in and payment is due again.");
  }else{
@@ -806,7 +798,7 @@ function startNextCompetition(){state.competition++;state.rollover=0;state.potCa
 function saveSettings(){state.entryFee=Number(document.getElementById("entryFee").value||5);state.deadline=document.getElementById("deadline").value.trim();state.rules=document.getElementById("rulesText").value.trim();save()}
 function saveTeams(){state.teams=document.getElementById("teamsText").value.split("\n").map(x=>x.trim()).filter(Boolean);save()}
 function saveAdminAccount(){state.adminUsername=document.getElementById("adminUsername").value.trim();state.adminPassword=document.getElementById("adminPassword").value.trim();authUser.name=state.adminUsername;localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));save()}
-function savePlayerAccount(){
+async function savePlayerAccount(){
  const p=currentPlayer();
  const oldName=p.name;
  const newName=document.getElementById("playerUsername").value.trim();
@@ -816,19 +808,28 @@ function savePlayerAccount(){
  if(!newName)return toast("Display name is required.");
  if(!isAdminPlayer&&!newPin)return toast("Password is required.");
  if(state.players.some(x=>x!==p&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
- p.name=newName;
- if(!isAdminPlayer)p.pin=newPin;
- state.selectedPlayer=newName;
- if(authUser&&authUser.role==="player"&&authUser.name===oldName){
-  authUser.name=newName;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ try{
+  if(!isAdminPlayer&&newPin){
+   const {error}=await supabaseClient.rpc("app_change_password",{p_user_id:p.id,p_new_password:newPin});
+   if(error)throw error;
+  }
+  p.name=newName;
+  if(!isAdminPlayer)p.pin="";
+  state.selectedPlayer=newName;
+  if(authUser&&authUser.role==="player"&&authUser.name===oldName){
+   authUser.name=newName;
+   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  }
+  if(authUser&&authUser.role==="admin"&&authUser.name===oldName){
+   authUser.name=newName;
+   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  }
+  toast(isAdminPlayer?"Display name updated. Admin password unchanged.":"Account updated.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Could not update account: "+(e.message||"unknown error"));
  }
- if(authUser&&authUser.role==="admin"&&authUser.name===oldName){
-  authUser.name=newName;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
- }
- toast(isAdminPlayer?"Display name updated. Admin password unchanged.":"Account updated.");
- save();
 }
 function saveNotificationMessages(){
  state.notifications={
@@ -886,6 +887,31 @@ function setOnlineStatus(text,ok){
  el.style.color=ok?"#166534":"#991b1b";
 }
 
+
+async function completeForcedPasswordReset(){
+ const p1=document.getElementById("forcedNewPassword").value.trim();
+ const p2=document.getElementById("forcedConfirmPassword").value.trim();
+ if(!p1)return toast("Enter a new password.");
+ if(p1.length<4)return toast("Password must be at least 4 characters.");
+ if(p1!==p2)return toast("Passwords do not match.");
+ try{
+  const {error}=await supabaseClient.rpc("app_change_password",{
+   p_user_id:authUser.user_id,
+   p_new_password:p1
+  });
+  if(error)throw error;
+  authUser.must_reset_password=false;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  toast("Password updated.");
+  await dbLoad();
+  page=authUser.role==="admin"?"dashboard":"myPick";
+  render();
+ }catch(e){
+  console.error(e);
+  toast("Could not update password: "+(e.message||"unknown error"));
+ }
+}
+
 async function dbLoad(){
  try{
   const [settingsRes, compsRes, usersRes, stateRes, historyRes, teamsRes, champsRes]=await Promise.all([
@@ -927,6 +953,15 @@ async function dbLoad(){
    if(!histByUser[h.user_id])histByUser[h.user_id]=[];
    histByUser[h.user_id].push(h.team);
   });
+
+  if(authUser&&authUser.user_id){
+   const me=(usersRes.data||[]).find(u=>u.id===authUser.user_id);
+   if(me){
+    authUser.name=me.display_name||me.username;
+    authUser.must_reset_password=!!me.must_reset_password;
+    localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+   }
+  }
 
   state.players=(usersRes.data||[]).map(u=>{
    const ps=stateByUser[u.id]||{};
@@ -1038,7 +1073,7 @@ async function loginUser(){
   if(error)throw error;
   if(!data||!data.length)return toast("Account not found.");
   const u=data[0];
-  authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id};
+  authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   await dbLoad();
@@ -1066,7 +1101,7 @@ async function loginAdmin(){
   const {data,error}=await supabaseClient.rpc("app_login",{p_username:u,p_password:p});
   if(error)throw error;
   if(!data||!data.length||data[0].role!=="admin")return toast("Incorrect admin login.");
-  authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id};
+  authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id,must_reset_password:!!data[0].must_reset_password};
   currentUserId=data[0].user_id;
   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   adminView="admin";
@@ -1093,7 +1128,7 @@ async function createAccount(){
   if(error)throw error;
   if(!data||!data.length)return toast("Could not create account.");
   const u=data[0];
-  authUser={name:u.display_name,username:u.username,role:"player",user_id:u.user_id};
+  authUser={name:u.display_name,username:u.username,role:"player",user_id:u.user_id,must_reset_password:false};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   await dbLoad();
@@ -1118,7 +1153,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=2").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=4").catch(console.error));
 }
 
 boot();
