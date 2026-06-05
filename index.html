@@ -352,7 +352,7 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHA
 let onlineReady=false;
 let currentUserId=null;
 
-const storeKey="seah_wind_lms_live_supabase_v2";
+const storeKey="seah_wind_lms_live_supabase_v15";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -378,7 +378,13 @@ function paid(){return state.players.filter(p=>p.paid&&p.approved)}
 function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive)}
 function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
 function pot(){return (state.potCarryover||0)+(paid().length*state.entryFee)}
-function currentPlayer(){return state.players.find(p=>p.name===state.selectedPlayer)||state.players[0]||{name:"",approved:false,paid:false,alive:true,wins:0,pick:"",locked:false,previous:[]}}
+function currentPlayer(){
+ if(authUser&&authUser.user_id){
+  const byId=state.players.find(p=>p.id===authUser.user_id);
+  if(byId)return byId;
+ }
+ return state.players.find(p=>p.name===state.selectedPlayer)||state.players[0]||{name:"",approved:false,paid:false,alive:true,wins:0,pick:"",locked:false,previous:[]};
+}
 function defendingChampion(){return state.champions.length?state.champions[state.champions.length-1].name:"None"}
 function stars(n){return n?"⭐".repeat(n):""}
 function displayName(p){return `${defendingChampion()===p.name?"🏆 ":""}${p.name} ${stars(p.wins)}`.trim()}
@@ -426,18 +432,20 @@ function renderAuth(){
 /* create account replaced below */
 function logout(){authUser=null;localStorage.removeItem("seah_auth_user_current");page="dashboard";renderAuth()}
 function ensureAdminPlayer(){
- let p=state.players.find(x=>x.adminPlayer===true);
+ let p=(authUser&&authUser.user_id)?state.players.find(x=>x.id===authUser.user_id):null;
+ if(!p) p=state.players.find(x=>x.adminPlayer===true);
  if(!p){
   p=state.players.find(x=>x.name===authUser.name);
   if(p) p.adminPlayer=true;
  }
  if(!p){
-  state.players.unshift({name:authUser.name,pin:"admin",approved:true,paid:true,alive:true,wins:0,pick:"",locked:false,result:"pending",previous:[],outRound:null,outPick:null,notifications:true,adminPlayer:true});
-  p=state.players[0];
+  p={id:authUser.user_id,username:authUser.username,name:authUser.name,pin:"admin",approved:true,paid:true,alive:true,wins:0,pick:"",locked:false,result:"pending",previous:[],outRound:null,outPick:null,notifications:authUser.notifications_enabled===false?false:true,adminPlayer:true};
+  state.players.unshift(p);
  }
+ p.adminPlayer=true;
  p.approved=true;
  if(typeof p.paid==="undefined") p.paid=true;
- if(typeof p.notifications==="undefined") p.notifications=true;
+ if(typeof p.notifications==="undefined") p.notifications=authUser.notifications_enabled===false?false:true;
  return p;
 }
 function switchAdminView(view){
@@ -573,6 +581,10 @@ async function togglePlayerNotifications(){
 
   const savedValue=checkRes.data?checkRes.data.notifications_enabled:next;
   p.notifications=!!savedValue;
+  if(authUser){
+   authUser.notifications_enabled=p.notifications;
+   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  }
 
   toast("Notifications turned "+(p.notifications?"on":"off")+".");
   localStorage.setItem(storeKey,JSON.stringify(state));
@@ -990,6 +1002,7 @@ async function dbLoad(){
    if(me){
     authUser.name=me.display_name||me.username;
     authUser.must_reset_password=!!me.must_reset_password;
+    authUser.notifications_enabled=me.notifications_enabled===false?false:true;
     localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
    }
   }
@@ -1114,10 +1127,12 @@ async function loginUser(){
   if(error)throw error;
   if(!data||!data.length)return toast("Account not found.");
   const u=data[0];
-  authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password};
+  authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   await dbLoad();
+  const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
+  if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
   if(u.role==="admin"){
    adminView="admin";
    localStorage.setItem("seah_admin_view_current",adminView);
@@ -1142,13 +1157,15 @@ async function loginAdmin(){
   const {data,error}=await supabaseClient.rpc("app_login",{p_username:u,p_password:p});
   if(error)throw error;
   if(!data||!data.length||data[0].role!=="admin")return toast("Incorrect admin login.");
-  authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id,must_reset_password:!!data[0].must_reset_password};
+  authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id,must_reset_password:!!data[0].must_reset_password,notifications_enabled:data[0].notifications_enabled===false?false:true};
   currentUserId=data[0].user_id;
   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   adminView="admin";
   localStorage.setItem("seah_admin_view_current",adminView);
   page="dashboard";
   await dbLoad();
+  const loggedInAdmin=state.players.find(p=>p.id===data[0].user_id);
+  if(loggedInAdmin)loggedInAdmin.notifications=data[0].notifications_enabled===false?false:true;
   render();
  }catch(e){
   console.error(e);
@@ -1194,7 +1211,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=10").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=11").catch(console.error));
 }
 
 boot();
