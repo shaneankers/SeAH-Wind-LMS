@@ -551,11 +551,12 @@ async function togglePlayerNotifications(){
  const p=currentPlayer();
  if(!p)return toast("Player not found.");
  const next=!p.notifications;
+ const username=p.username||authUser?.username||p.name;
  p.notifications=next;
  try{
-  if(onlineReady&&p.id){
-   const {error}=await supabaseClient.rpc("app_set_notifications",{
-    p_user_id:p.id,
+  if(onlineReady&&username){
+   const {error}=await supabaseClient.rpc("app_set_notifications_by_username",{
+    p_username:username,
     p_enabled:next
    });
    if(error)throw error;
@@ -1170,7 +1171,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=7").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=8").catch(console.error));
 }
 
 boot();
