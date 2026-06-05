@@ -1011,7 +1011,7 @@ async function dbLoad(){
     previous:histByUser[u.id]||[],
     outRound:ps.out_round,
     outPick:ps.out_pick,
-    notifications:u.notifications_enabled!==false,
+    notifications:u.notifications_enabled === false ? false : true,
     adminPlayer:u.role==="admin"
    };
   });
@@ -1029,6 +1029,16 @@ async function dbLoad(){
    comp:c.competition_number,
    rollover:c.rollover_number
   }));
+
+  if(authUser&&authUser.username){
+   const me=state.players.find(p=>(p.username||"").toLowerCase()===authUser.username.toLowerCase());
+   if(me){
+    state.selectedPlayer=me.name;
+    authUser.name=me.name;
+    authUser.notifications_enabled=me.notifications;
+    localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+   }
+  }
 
   onlineReady=true;
   localStorage.setItem(storeKey,JSON.stringify(state));
@@ -1184,7 +1194,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=9").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=10").catch(console.error));
 }
 
 boot();
