@@ -266,6 +266,24 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 .round-controls-8020 select option[value="lose"]{color:#dc2626;font-weight:900}
 
 .auth-link{background:transparent!important;color:#9a3412!important;padding:10px 0!important;width:100%;text-align:center;box-shadow:none!important}
+
+.sidebar.admin-mode .profile{
+  background:linear-gradient(135deg,#fde047 0%,#ffffff 100%) !important;
+  border:0 !important;
+  color:#111827 !important;
+  text-align:center !important;
+}
+.sidebar.admin-mode .profile strong{
+  color:#111827 !important;
+  font-size:30px !important;
+  display:block !important;
+  font-weight:1000 !important;
+  letter-spacing:-.04em !important;
+}
+.sidebar.admin-mode .profile .tiny{
+  display:none !important;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -404,7 +422,7 @@ function render(){
   if(p.locked && !p.pick) p.locked=false;
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
- if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Admin":currentPlayer().name;document.getElementById("sideSub").textContent=role==="admin"?`Pot £${pot()}`:"";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
+ if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
 function setPage(p){page=p;render()}
 function dashboard(){const pending=state.players.filter(p=>!p.approved),unpaid=state.players.filter(p=>p.approved&&!p.paid),missing=alive().filter(p=>!p.pick);return `<div class="stats"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(p=>p.approved).length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Needs Attention</strong></div><div class="card-body list"><div class="item"><div><div class="item-title">Pending Approval</div><div class="tiny">${pending.map(p=>p.name).join(", ")||"None"}</div></div><div class="actions"><span class="badge yellow">${pending.length}</span><button class="small" onclick="setPage('players')" ${pending.length?'':'disabled'}>Review</button></div></div><div class="item"><div><div class="item-title">Unpaid Players</div><div class="tiny">${unpaid.map(p=>p.name).join(", ")||"Everyone has paid"}</div></div><div class="actions"><span class="badge yellow">${unpaid.length}</span><button class="small" onclick="notifyUnpaid()" ${unpaid.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Missing Picks</div><div class="tiny">${missing.map(p=>p.name).join(", ")||"Everyone has picked"}</div></div><div class="actions"><span class="badge orange">${missing.length}</span><button class="small" onclick="notifyMissingPicks()" ${missing.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Announcements</div><div class="tiny">Send winner or rollover updates</div></div><div class="admin-action-grid"><button class="small green" onclick="notifyWinner()">Winner</button><button class="small yellow" onclick="notifyRollover()">Rollover</button></div></div>
 
@@ -469,7 +487,7 @@ function rules(){return `<div class="card"><div class="card-head"><strong>Compet
 function playerSettings(){
  const p=currentPlayer();
  return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
-   <label>Username</label><input id="playerUsername" value="${p.name}">
+   <label>Display Name</label><input id="playerUsername" value="${p.name}">
    <label style="margin-top:12px">PIN / Password</label><input id="playerPin" type="password" value="${p.pin||""}">
    <br><br><button onclick="savePlayerAccount()">Save Account</button>
  </div></div>
@@ -601,7 +619,7 @@ function saveRenamePlayer(){
  if(!p)return toast("Player not found.");
  const newName=(input?.value||"").trim();
  if(!newName)return toast("Enter a display name.");
- if(state.players.some((x,idx)=>idx!==i&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That player name already exists.");
+ if(state.players.some((x,idx)=>idx!==i&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
  const oldName=p.name;
  p.name=newName;
  if(state.selectedPlayer===oldName)state.selectedPlayer=newName;
@@ -710,8 +728,8 @@ function savePlayerAccount(){
  const oldName=p.name;
  const newName=document.getElementById("playerUsername").value.trim();
  const newPin=document.getElementById("playerPin").value.trim();
- if(!newName||!newPin)return toast("Name and password are required.");
- if(state.players.some(x=>x!==p&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That player name already exists.");
+ if(!newName||!newPin)return toast("Display name and password are required.");
+ if(state.players.some(x=>x!==p&&x.name.toLowerCase()===newName.toLowerCase()))return toast("That display name already exists.");
  p.name=newName;
  p.pin=newPin;
  state.selectedPlayer=newName;
