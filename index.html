@@ -661,18 +661,22 @@ function saveRenamePlayer(){
 async function resetPlayerPassword(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
+ const username=p.username||p.name;
  const newPass=prompt("Enter temporary password for "+p.name+":");
  if(newPass===null)return;
  if(newPass.trim().length<4)return toast("Password must be at least 4 characters.");
  try{
-  const {error}=await supabaseClient.rpc("admin_reset_password",{p_user_id:p.id,p_new_password:newPass.trim()});
+  const {error}=await supabaseClient.rpc("admin_reset_password_by_username",{
+   p_username:username,
+   p_new_password:newPass.trim()
+  });
   if(error)throw error;
   toast("Password reset for "+p.name+".");
   addAdminAlert("Password reset",p.name+" now has a temporary password. Tell them to log in and change it.");
   save();
  }catch(e){
   console.error(e);
-  toast("Password reset failed. Run the password reset SQL first.");
+  toast("Password reset failed: "+(e.message||"unknown error"));
  }
 }
 
@@ -1075,7 +1079,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=2").catch(console.error));
 }
 
 boot();
