@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
 <meta name="theme-color" content="#f97316"/>
+<link rel="manifest" href="manifest.webmanifest"/>
 <style>
 :root{
   --bg:#0f172a;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e5e7eb;
@@ -284,6 +285,18 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
   display:none !important;
 }
 
+
+.admin-alert{
+  border:2px solid #f97316;
+  background:#fff7ed;
+  color:#7c2d12;
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:14px;
+  line-height:1.45;
+}
+.admin-alert strong{display:block;font-size:16px;margin-bottom:4px;color:#9a3412}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -418,13 +431,16 @@ function switchAdminView(view){
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
+ if(!state.adminAlerts)state.adminAlerts=[];
  state.players.forEach(p=>{
   if(p.locked && !p.pick) p.locked=false;
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
  if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
 function setPage(p){page=p;render()}
-function dashboard(){const pending=state.players.filter(p=>!p.approved),unpaid=state.players.filter(p=>p.approved&&!p.paid),missing=alive().filter(p=>!p.pick);return `<div class="stats"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(p=>p.approved).length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Needs Attention</strong></div><div class="card-body list"><div class="item"><div><div class="item-title">Pending Approval</div><div class="tiny">${pending.map(p=>p.name).join(", ")||"None"}</div></div><div class="actions"><span class="badge yellow">${pending.length}</span><button class="small" onclick="setPage('players')" ${pending.length?'':'disabled'}>Review</button></div></div><div class="item"><div><div class="item-title">Unpaid Players</div><div class="tiny">${unpaid.map(p=>p.name).join(", ")||"Everyone has paid"}</div></div><div class="actions"><span class="badge yellow">${unpaid.length}</span><button class="small" onclick="notifyUnpaid()" ${unpaid.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Missing Picks</div><div class="tiny">${missing.map(p=>p.name).join(", ")||"Everyone has picked"}</div></div><div class="actions"><span class="badge orange">${missing.length}</span><button class="small" onclick="notifyMissingPicks()" ${missing.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Announcements</div><div class="tiny">Send winner or rollover updates</div></div><div class="admin-action-grid"><button class="small green" onclick="notifyWinner()">Winner</button><button class="small yellow" onclick="notifyRollover()">Rollover</button></div></div>
+function dismissAdminAlert(i){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.splice(i,1);save()}
+function addAdminAlert(title,message){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.unshift({title,message,created:new Date().toISOString()});}
+function dashboard(){const pending=state.players.filter(p=>!p.approved),unpaid=state.players.filter(p=>p.approved&&!p.paid),missing=alive().filter(p=>!p.pick);const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");return `${alerts}<div class="stats"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(p=>p.approved).length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Needs Attention</strong></div><div class="card-body list"><div class="item"><div><div class="item-title">Pending Approval</div><div class="tiny">${pending.map(p=>p.name).join(", ")||"None"}</div></div><div class="actions"><span class="badge yellow">${pending.length}</span><button class="small" onclick="setPage('players')" ${pending.length?'':'disabled'}>Review</button></div></div><div class="item"><div><div class="item-title">Unpaid Players</div><div class="tiny">${unpaid.map(p=>p.name).join(", ")||"Everyone has paid"}</div></div><div class="actions"><span class="badge yellow">${unpaid.length}</span><button class="small" onclick="notifyUnpaid()" ${unpaid.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Missing Picks</div><div class="tiny">${missing.map(p=>p.name).join(", ")||"Everyone has picked"}</div></div><div class="actions"><span class="badge orange">${missing.length}</span><button class="small" onclick="notifyMissingPicks()" ${missing.length?'':'disabled'}>Notify</button></div></div><div class="item"><div><div class="item-title">Announcements</div><div class="tiny">Send winner or rollover updates</div></div><div class="admin-action-grid"><button class="small green" onclick="notifyWinner()">Winner</button><button class="small yellow" onclick="notifyRollover()">Rollover</button></div></div>
 
 </div></div>`}
 function players(){
@@ -455,6 +471,7 @@ function players(){
          <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
          <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
          <button class="small secondary" onclick="renamePlayer(${i})">Rename</button>
+         <button class="small yellow" onclick="resetPlayerPassword(${i})">Reset Password</button>
          <button class="small red" onclick="rejectPlayer(${i})">Remove</button>
        </div>
      </div>`}).join(""):`<div class="notice">No approved players yet.</div>`}
@@ -474,7 +491,7 @@ function round(){
      </div>`}).join("")||`<div class="notice">No alive players.</div>`}
    </div>
  </div>
- <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="ghost" onclick="nextRoundOnly()">Next Round</button></div>`;
+ <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button></div>`;
 }
 function myPick(){const p=currentPlayer(),selected=window.tempPick||p.pick||"";if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;return `<div class="stats five"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(x=>x.approved).length}</div></div><div class="stat"><div class="label">Remaining</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${p.alive?'Yes':'No'}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Player Dashboard</strong></div><div class="card-body list"><div class="item"><div class="item-title">Payment</div><span class="badge ${p.paid?'green':'red'}">${p.paid?'Paid':'Not Paid'}</span></div><div class="item"><div class="item-title">Team Selection</div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Team Selected':'Awaiting Selection'}</span></div></div></div><div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body"><div class="item" style="margin-bottom:12px"><div><div class="item-title">Current Pick</div><div class="tiny">${p.pick||"No team selected"}</div></div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Submitted':'Not Submitted'}</span></div>${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}<div class="pick-grid">
   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
@@ -502,7 +519,7 @@ function playerSettings(){
 
  <div class="card"><div class="card-head"><strong>Add App</strong></div><div class="card-body">
    <button class="install-button" onclick="addAppGuide()">📲 Add App to Home Screen</button>
-   <div id="installHelp" class="notice" style="display:none;margin-top:12px">Use your browser menu and choose <strong>Add to Home Screen</strong>. The automatic install prompt can be added once the app is hosted.</div>
+   <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install help:</strong><br>Android/Chrome: tap the browser menu ⋮ and choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.<br><br>If an install prompt is available, this button will open it automatically.</div>
  </div></div>`;
 }
 
@@ -513,7 +530,14 @@ function togglePlayerNotifications(){
  save();
 }
 
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredInstallPrompt=e;});
 function addAppGuide(){
+ if(deferredInstallPrompt){
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(()=>{deferredInstallPrompt=null;});
+  return;
+ }
  const el=document.getElementById("installHelp");
  if(el)el.style.display=el.style.display==="none"?"block":"none";
 }
@@ -633,6 +657,25 @@ function saveRenamePlayer(){
 }
 
 
+
+async function resetPlayerPassword(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ const newPass=prompt("Enter temporary password for "+p.name+":");
+ if(newPass===null)return;
+ if(newPass.trim().length<4)return toast("Password must be at least 4 characters.");
+ try{
+  const {error}=await supabaseClient.rpc("admin_reset_password",{p_user_id:p.id,p_new_password:newPass.trim()});
+  if(error)throw error;
+  toast("Password reset for "+p.name+".");
+  addAdminAlert("Password reset",p.name+" now has a temporary password. Tell them to log in and change it.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Password reset failed. Run the password reset SQL first.");
+ }
+}
+
 function setPick(i,v){state.players[i].pick=v;save()}
 function setResult(i,v){state.players[i].result=v;save()}
 function chooseTempPick(v){window.tempPick=v;render()}
@@ -695,6 +738,8 @@ function processRound(){
  if(s.length===1){
   s[0].wins++;
   state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
+  addAdminAlert("Winner found","Winner: "+s[0].name+". Sort the prize money and then start the next competition when ready.");
+  alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
   toast("Winner: "+s[0].name);
   page="playerHall";
  }else if(s.length===0&&before>0){
@@ -710,6 +755,8 @@ function processRound(){
    p.locked=false;
    p.result="pending";
   });
+  addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Everyone is back in and payment is due again.");
+  alert("Rollover started.\n\nAdmin action needed: collect payment again from everyone who is back in.");
   toast("Rollover "+state.rollover+" started. Everyone is back in and payment is due again.");
  }else{
   state.round++;
@@ -1025,6 +1072,11 @@ async function boot(){
  await dbLoad();
 }
 
+
+
+if("serviceWorker" in navigator){
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(console.error));
+}
 
 boot();
 </script>
