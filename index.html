@@ -545,6 +545,47 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   cursor:pointer;
   display:inline-flex;
 }
+.activity-controls{
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid #edf2f7;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.activity-count-note{
+  font-size:13px;
+  color:#64748b;
+}
+.activity-more-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.activity-clear-zone{
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid #edf2f7;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.activity-clear-zone .small.red{
+  font-size:13px;
+  padding:10px 14px;
+}
+.activity-clear-note{
+  color:#64748b;
+  font-size:13px;
+  line-height:1.35;
+}
+@media(max-width:560px){
+ .activity-controls,.activity-clear-zone{align-items:flex-start;flex-direction:column}
+}
 
 .action-targets{
   margin-top:8px;
@@ -1012,8 +1053,13 @@ function appIcon(name){
 }
 
 
+const ACTIVITY_LIMIT=200;
+const ADMIN_ACTIVITY_START=4;
+const ACTIVITY_CHUNK=30;
+const PLAYER_NEWS_START=30;
 function ensureActivityLog(){
- if(!state.activityLog)state.activityLog=[];
+ if(!Array.isArray(state.activityLog))state.activityLog=[];
+ if(state.activityLog.length>ACTIVITY_LIMIT)state.activityLog=state.activityLog.slice(0,ACTIVITY_LIMIT);
 }
 function addActivity(type,title,detail){
  ensureActivityLog();
@@ -1023,7 +1069,7 @@ function addActivity(type,title,detail){
   detail:detail||"",
   time:new Date().toISOString()
  });
- state.activityLog=state.activityLog.slice(0,1000);
+ state.activityLog=state.activityLog.slice(0,ACTIVITY_LIMIT);
 }
 function activityIcon(type){
  const map={pick:"ball",paid:"money",player:"users",round:"trophy",notify:"bell",info:"check"};
@@ -1040,39 +1086,39 @@ function activityTimeLabel(iso){
  const days=Math.floor(hrs/24);
  return days+"d ago";
 }
-function adminActivityLimit(){
- const total=(state.activityLog||[]).length;
- const limit=window.adminActivityLimit||4;
- return Math.min(limit,total);
+function getAdminActivityLimit(){
+ ensureActivityLog();
+ const limit=Number(window.__adminActivityLimit||ADMIN_ACTIVITY_START);
+ return Math.min(limit,state.activityLog.length);
 }
-function playerNewsLimit(){
- const total=(state.activityLog||[]).length;
- const limit=window.playerNewsLimit||30;
- return Math.min(limit,total);
+function getPlayerNewsLimit(){
+ ensureActivityLog();
+ const limit=Number(window.__playerNewsLimit||PLAYER_NEWS_START);
+ return Math.min(limit,state.activityLog.length);
 }
 function showMoreAdminActivity(){
  ensureActivityLog();
- window.adminActivityLimit=Math.min((window.adminActivityLimit||4)+30,state.activityLog.length);
+ window.__adminActivityLimit=Math.min(getAdminActivityLimit()+ACTIVITY_CHUNK,state.activityLog.length);
  render();
 }
 function showLessAdminActivity(){
- window.adminActivityLimit=4;
+ window.__adminActivityLimit=ADMIN_ACTIVITY_START;
  render();
 }
 function showMorePlayerNews(){
  ensureActivityLog();
- window.playerNewsLimit=Math.min((window.playerNewsLimit||30)+30,state.activityLog.length);
+ window.__playerNewsLimit=Math.min(getPlayerNewsLimit()+ACTIVITY_CHUNK,state.activityLog.length);
  render();
 }
 function showLessPlayerNews(){
- window.playerNewsLimit=30;
+ window.__playerNewsLimit=PLAYER_NEWS_START;
  render();
 }
 function resetRecentActivity(){
  if(!confirm("Clear Recent Activity? This only clears the activity/news feed. It will not delete players, picks, payments or competition data."))return;
  state.activityLog=[];
- window.adminActivityLimit=4;
- window.playerNewsLimit=30;
+ window.__adminActivityLimit=ADMIN_ACTIVITY_START;
+ window.__playerNewsLimit=PLAYER_NEWS_START;
  toast("Recent Activity cleared.");
  save();
 }
@@ -1130,13 +1176,15 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('check')}</span>Recent Activity</div><span class="badge orange">${state.activityLog.length}</span></div>
    <div class="activity-list">
-    ${renderActivityRows(adminActivityLimit())}
+    ${renderActivityRows(getAdminActivityLimit())}
    </div>
+   ${(state.activityLog||[]).length?`<div class="activity-clear-zone"><button class="small red" onclick="resetRecentActivity()">Clear Activity</button><div class="activity-clear-note">This clears the activity/news feed only.<br>Players, picks, payments and competition data are not affected.</div></div>`:""}
    <div class="activity-controls">
-    ${(state.activityLog||[]).length>adminActivityLimit()?`<button class="small ghost" onclick="showMoreAdminActivity()">Show 30 more</button>`:""}
-    ${adminActivityLimit()>4?`<button class="small secondary" onclick="showLessAdminActivity()">Show less</button>`:""}
-    ${(state.activityLog||[]).length?`<button class="small red" onclick="resetRecentActivity()">Clear Activity</button>`:""}
-    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${adminActivityLimit()} of ${state.activityLog.length}</span>`:""}
+    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${getAdminActivityLimit()} of ${state.activityLog.length}</span>`:""}
+    <div class="activity-more-actions">
+     ${(state.activityLog||[]).length>getAdminActivityLimit()?`<button class="small ghost" onclick="showMoreAdminActivity()">Show 30 more</button>`:""}
+     ${getAdminActivityLimit()>ADMIN_ACTIVITY_START?`<button class="small secondary" onclick="showLessAdminActivity()">Show less</button>`:""}
+    </div>
    </div>
   </div>
 
@@ -1239,12 +1287,14 @@ function latestNews(){
   <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
   <div class="card-body">
    <div class="activity-list">
-    ${renderActivityRows(playerNewsLimit())}
+    ${renderActivityRows(getPlayerNewsLimit())}
    </div>
    <div class="activity-controls">
-    ${(state.activityLog||[]).length>playerNewsLimit()?`<button class="small ghost" onclick="showMorePlayerNews()">Show 30 more</button>`:""}
-    ${playerNewsLimit()>30?`<button class="small secondary" onclick="showLessPlayerNews()">Show less</button>`:""}
-    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${playerNewsLimit()} of ${state.activityLog.length}</span>`:""}
+    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${getPlayerNewsLimit()} of ${state.activityLog.length}</span>`:""}
+    <div class="activity-more-actions">
+     ${(state.activityLog||[]).length>getPlayerNewsLimit()?`<button class="small ghost" onclick="showMorePlayerNews()">Show 30 more</button>`:""}
+     ${getPlayerNewsLimit()>PLAYER_NEWS_START?`<button class="small secondary" onclick="showLessPlayerNews()">Show less</button>`:""}
+    </div>
    </div>
   </div>
  </div>`;
