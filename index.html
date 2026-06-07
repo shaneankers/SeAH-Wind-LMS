@@ -719,6 +719,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   }
 }
 
+/* v34 final launch polish */
+/* Activity feed is chunked for both Admin Recent Activity and Player Latest News. */
 /* v31 launch polish */
 .recipient-line{
   margin-top:8px!important;
@@ -1021,7 +1023,7 @@ function addActivity(type,title,detail){
   detail:detail||"",
   time:new Date().toISOString()
  });
- state.activityLog=state.activityLog.slice(0,50);
+ state.activityLog=state.activityLog.slice(0,1000);
 }
 function activityIcon(type){
  const map={pick:"ball",paid:"money",player:"users",round:"trophy",notify:"bell",info:"check"};
@@ -1038,9 +1040,41 @@ function activityTimeLabel(iso){
  const days=Math.floor(hrs/24);
  return days+"d ago";
 }
-function toggleActivityList(){
- window.showAllActivity=!window.showAllActivity;
+function adminActivityLimit(){
+ const total=(state.activityLog||[]).length;
+ const limit=window.adminActivityLimit||4;
+ return Math.min(limit,total);
+}
+function playerNewsLimit(){
+ const total=(state.activityLog||[]).length;
+ const limit=window.playerNewsLimit||30;
+ return Math.min(limit,total);
+}
+function showMoreAdminActivity(){
+ ensureActivityLog();
+ window.adminActivityLimit=Math.min((window.adminActivityLimit||4)+30,state.activityLog.length);
  render();
+}
+function showLessAdminActivity(){
+ window.adminActivityLimit=4;
+ render();
+}
+function showMorePlayerNews(){
+ ensureActivityLog();
+ window.playerNewsLimit=Math.min((window.playerNewsLimit||30)+30,state.activityLog.length);
+ render();
+}
+function showLessPlayerNews(){
+ window.playerNewsLimit=30;
+ render();
+}
+function resetRecentActivity(){
+ if(!confirm("Clear Recent Activity? This only clears the activity/news feed. It will not delete players, picks, payments or competition data."))return;
+ state.activityLog=[];
+ window.adminActivityLimit=4;
+ window.playerNewsLimit=30;
+ toast("Recent Activity cleared.");
+ save();
 }
 
 function announcementTargets(type){
@@ -1096,9 +1130,14 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('check')}</span>Recent Activity</div><span class="badge orange">${state.activityLog.length}</span></div>
    <div class="activity-list">
-    ${renderActivityRows(window.showAllActivity?50:4)}
+    ${renderActivityRows(adminActivityLimit())}
    </div>
-   ${(state.activityLog||[]).length>4?`<span class="activity-toggle" onclick="toggleActivityList()">${window.showAllActivity?'Show less':'View full activity list'} ›</span>`:""}
+   <div class="activity-controls">
+    ${(state.activityLog||[]).length>adminActivityLimit()?`<button class="small ghost" onclick="showMoreAdminActivity()">Show 30 more</button>`:""}
+    ${adminActivityLimit()>4?`<button class="small secondary" onclick="showLessAdminActivity()">Show less</button>`:""}
+    ${(state.activityLog||[]).length?`<button class="small red" onclick="resetRecentActivity()">Clear Activity</button>`:""}
+    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${adminActivityLimit()} of ${state.activityLog.length}</span>`:""}
+   </div>
   </div>
 
   <div class="pro-card">
@@ -1200,7 +1239,12 @@ function latestNews(){
   <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
   <div class="card-body">
    <div class="activity-list">
-    ${renderActivityRows(30)}
+    ${renderActivityRows(playerNewsLimit())}
+   </div>
+   <div class="activity-controls">
+    ${(state.activityLog||[]).length>playerNewsLimit()?`<button class="small ghost" onclick="showMorePlayerNews()">Show 30 more</button>`:""}
+    ${playerNewsLimit()>30?`<button class="small secondary" onclick="showLessPlayerNews()">Show less</button>`:""}
+    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${playerNewsLimit()} of ${state.activityLog.length}</span>`:""}
    </div>
   </div>
  </div>`;
