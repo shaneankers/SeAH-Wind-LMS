@@ -720,7 +720,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v26";
+const storeKey="seah_wind_lms_live_supabase_v27";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -781,21 +781,23 @@ function noteText(key, extra={}){
 
 async function syncUsersFromSupabase(){
  try{
-  if(!onlineReady)return;
+  if(!onlineReady)return false;
   const {data,error}=await supabaseClient
    .from("app_users")
    .select("id,username,display_name,role,approved,notifications_enabled")
    .eq("role","player")
    .order("display_name",{ascending:true});
   if(error)throw error;
-  if(!Array.isArray(data))return;
+  if(!Array.isArray(data))return false;
+
+  let changed=false;
 
   data.forEach(u=>{
    let p=state.players.find(x=>x.id===u.id);
    if(!p)p=state.players.find(x=>(x.username||"").toLowerCase()===(u.username||"").toLowerCase());
 
    if(!p){
-    p={
+    state.players.push({
      id:u.id,
      username:u.username,
      name:u.display_name||u.username,
@@ -810,28 +812,40 @@ async function syncUsersFromSupabase(){
      outRound:null,
      outPick:null,
      notifications:u.notifications_enabled!==false
-    };
-    state.players.push(p);
+    });
+    changed=true;
    }else{
-    p.id=u.id;
-    p.username=u.username;
-    p.name=u.display_name||p.name||u.username;
-    p.approved=!!u.approved;
-    if(typeof p.paid==="undefined")p.paid=false;
-    if(typeof p.alive==="undefined")p.alive=true;
-    if(typeof p.wins==="undefined")p.wins=0;
-    if(typeof p.pick==="undefined")p.pick="";
-    if(typeof p.locked==="undefined")p.locked=false;
-    if(typeof p.result==="undefined")p.result="pending";
-    if(!Array.isArray(p.previous))p.previous=[];
-    if(typeof p.notifications==="undefined")p.notifications=u.notifications_enabled!==false;
+    const newName=u.display_name||p.name||u.username;
+    const newApproved=!!u.approved;
+    if(p.id!==u.id){p.id=u.id;changed=true;}
+    if(p.username!==u.username){p.username=u.username;changed=true;}
+    if(p.name!==newName){p.name=newName;changed=true;}
+    if(p.approved!==newApproved){p.approved=newApproved;changed=true;}
+    if(typeof p.paid==="undefined"){p.paid=false;changed=true;}
+    if(typeof p.alive==="undefined"){p.alive=true;changed=true;}
+    if(typeof p.wins==="undefined"){p.wins=0;changed=true;}
+    if(typeof p.pick==="undefined"){p.pick="";changed=true;}
+    if(typeof p.locked==="undefined"){p.locked=false;changed=true;}
+    if(typeof p.result==="undefined"){p.result="pending";changed=true;}
+    if(!Array.isArray(p.previous)){p.previous=[];changed=true;}
+    if(typeof p.notifications==="undefined"){p.notifications=u.notifications_enabled!==false;changed=true;}
    }
   });
 
-  localStorage.setItem(storeKey,JSON.stringify(state));
+  if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
+  return changed;
  }catch(e){
   console.warn("Could not sync users from Supabase",e);
+  return false;
  }
+}
+
+async function syncUsersAndRender(){
+ if(window.__syncingUsers)return;
+ window.__syncingUsers=true;
+ const changed=await syncUsersFromSupabase();
+ window.__syncingUsers=false;
+ if(changed)render();
 }
 
 function renderAuth(){
@@ -844,6 +858,10 @@ function renderAuth(){
  }
  if(authUser){
   login.style.display="none";app.style.display="block";
+  if(authUser.role==="admin"&&onlineReady&&!window.__initialUserSyncDone){
+   window.__initialUserSyncDone=true;
+   setTimeout(()=>syncUsersAndRender(),50);
+  }
   if(authUser.role==="admin"){const adminPlayer=ensureAdminPlayer();role=adminView;if(role==="player"){state.selectedPlayer=adminPlayer.name;if(["dashboard","players","round","settings"].includes(page))page="myPick"}else{if(["myPick","previous","competition","playerHall","rules","playerSettings"].includes(page))page="dashboard"}}
   else{role="player";state.selectedPlayer=authUser.name;if(page==="dashboard")page="myPick"}
   return true
@@ -886,13 +904,6 @@ function switchAdminView(view){
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
- if(authUser&&authUser.role==="admin"&&onlineReady&&!window.__syncingUsers){
-  window.__syncingUsers=true;
-  syncUsersFromSupabase().then(()=>{
-   window.__syncingUsers=false;
-   if(page==="players"||page==="dashboard")render();
-  }).catch(()=>{window.__syncingUsers=false;});
- }
  ensureActivityLog();
  if(!state.adminAlerts)state.adminAlerts=[];
  state.players.forEach(p=>{
@@ -900,7 +911,13 @@ function render(){
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
  if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
-function setPage(p){page=p;render()}
+function setPage(p){
+ page=p;
+ render();
+ if(authUser&&authUser.role==="admin"&&(p==="players"||p==="dashboard")){
+  syncUsersAndRender();
+ }
+}
 function dismissAdminAlert(i){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.splice(i,1);save()}
 function addAdminAlert(title,message){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.unshift({title,message,created:new Date().toISOString()});}
 
@@ -982,7 +999,7 @@ function dashboard(){
 
  <div class="stat-row">
   <div class="stat-pro"><div class="icon-wrap small">${appIcon('users')}</div><div><div class="num">${approved.length}</div><div class="lbl">Total Players</div></div></div>
-  <div class="stat-pro"><div class="icon-wrap small green">${appIcon('check')}</div><div><div class="num">${alivePlayers.length}</div><div class="lbl">Active Players</div></div></div>
+  <div class="stat-pro"><div class="icon-wrap small">${appIcon('users')}</div><div><div class="num">${pending.length}</div><div class="lbl">Pending Players</div></div></div>
   <div class="stat-pro"><div class="icon-wrap small">${appIcon('money')}</div><div><div class="num">${paidPlayers.length}</div><div class="lbl">Paid Players</div></div></div>
   <div class="stat-pro"><div class="icon-wrap small red">${appIcon('clock')}</div><div><div class="num">${missing.length}</div><div class="lbl">Yet to Pick</div></div></div>
  </div>
@@ -1150,7 +1167,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=26");
+ const registration=await navigator.serviceWorker.register("sw.js?v=27");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1974,7 +1991,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=26").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=27").catch(console.error));
 }
 
 boot();
