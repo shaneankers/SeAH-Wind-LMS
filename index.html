@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<meta name="theme-color" content="#f97316"/>
+<meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
 :root{
@@ -314,6 +314,94 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 }
 .reset-required-body{padding:20px}
 
+
+/* ===== v18 SeAH Wind LMS Branding Refresh ===== */
+:root{
+  --navy:#061426; --navy2:#0a1f3a; --navy3:#102d52;
+  --card:#ffffff; --ink:#071426; --muted:#64748b; --line:#e2e8f0;
+  --orange:#f4511e; --orange2:#ff6a2a; --yellow:#f59e0b;
+  --red:#dc2626; --green:#16a34a;
+  --shadow:0 24px 70px rgba(2,8,23,.28); --radius:24px;
+}
+body{
+  background:
+    radial-gradient(circle at 14% 4%,rgba(244,81,30,.22),transparent 28%),
+    radial-gradient(circle at 88% 12%,rgba(255,255,255,.08),transparent 28%),
+    linear-gradient(135deg,var(--navy),#020817 62%,#020617);
+  color:var(--ink);
+}
+.app{max-width:1220px;padding:18px}
+.header{background:transparent;color:white;margin-bottom:16px;align-items:center}
+.logo{
+  width:78px;height:78px;border-radius:20px;
+  background:#061426 url("icon-192.png") center/cover no-repeat;
+  box-shadow:0 20px 50px rgba(0,0,0,.36);overflow:hidden;
+}
+.logo-main,.logo-sub{display:none}
+.header h1{font-size:31px;color:#fff}.sub{color:#dbeafe}
+#onlineStatus{background:#dcfce7!important;color:#14532d!important;border:1px solid rgba(22,163,74,.18)}
+.shell{grid-template-columns:260px 1fr;gap:18px}
+.sidebar{
+  background:linear-gradient(180deg,#071a31,#031021)!important;
+  color:white;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow);
+}
+.main,.login-wrap{background:#f8fafc!important;border:1px solid rgba(255,255,255,.55);box-shadow:var(--shadow)}
+.profile{
+  background:#fff!important;border:1px solid rgba(255,255,255,.2)!important;
+  color:var(--ink)!important;box-shadow:0 12px 34px rgba(2,8,23,.14);
+}
+.profile strong{font-size:19px;color:var(--ink)}
+.sidebar.player-mode .profile,.sidebar.admin-mode .profile{background:#fff!important;color:var(--ink)!important;text-align:left!important}
+.sidebar.player-mode .profile strong,.sidebar.admin-mode .profile strong{color:var(--ink)!important;font-size:24px!important;display:block!important}
+.mode-switch{background:rgba(255,255,255,.06);border-radius:18px;padding:6px}
+.mode-switch button{background:transparent!important;color:#dbeafe!important;border-radius:13px;box-shadow:none}
+.mode-switch button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important;box-shadow:0 12px 28px rgba(244,81,30,.28)}
+.nav button{background:transparent!important;color:#dbeafe!important;border:1px solid transparent;border-radius:15px;padding:12px 14px;box-shadow:none}
+.nav button:hover{background:rgba(255,255,255,.08)!important;transform:none}
+.nav button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:#fff!important;box-shadow:0 14px 30px rgba(244,81,30,.28)}
+.logout-btn{background:rgba(255,255,255,.06)!important;color:#e2e8f0!important;border:1px solid rgba(255,255,255,.16)!important}
+.topline{background:#fff!important;border-bottom:1px solid var(--line);padding:22px 24px}.title{font-size:26px;color:var(--ink)}
+.body{padding:22px}
+.card,.stat,.item,.admin-row,.compact-player,.league-box,.round-compact-row,.player-list-row{
+  background:#fff!important;border:1px solid var(--line)!important;box-shadow:0 12px 28px rgba(2,8,23,.05);
+}
+.card{border-radius:22px}.card-head{background:#fff!important;border-bottom:1px solid #edf2f7}
+.card-head strong,.item-title,.admin-row-title,.compact-name,.round-name,.player-list-name{color:var(--ink)}
+.stats{gap:14px}.stat{border-radius:20px;padding:18px}.stat .label{color:#64748b}.stat .value{color:var(--ink)}
+button{background:linear-gradient(135deg,var(--orange),var(--orange2));color:white;box-shadow:0 10px 22px rgba(244,81,30,.18)}
+button:hover{background:linear-gradient(135deg,var(--orange2),var(--orange))}
+button.secondary{background:#0f2747!important} button.ghost{background:#fff7ed!important;color:#9a3412!important;box-shadow:none}
+button.yellow{background:#f59e0b!important;color:#111827!important} button.green{background:#16a34a!important;color:white!important}
+button.red{background:#dc2626!important;color:white!important}
+.badge.orange{background:#ffedd5;color:#c2410c}.badge.dark{background:#071a31;color:#fff}
+.comp-header{background:linear-gradient(135deg,#071a31,#0a2748)!important;color:white!important;box-shadow:0 18px 44px rgba(2,8,23,.2)}
+.comp-header h2{color:white}
+.login-hero{background:linear-gradient(145deg,#071a31,#020817)!important;color:white!important}
+.big-logo{
+  width:122px!important;height:122px!important;border-radius:28px!important;
+  background:#061426 url("icon-512.png") center/cover no-repeat!important;
+  box-shadow:0 22px 55px rgba(0,0,0,.38);
+}
+.big-logo .logo-main,.big-logo .logo-sub{display:none!important}
+.login-hero h1{color:white!important}.login-hero .sub{color:#cbd5e1!important}
+.login-tabs button{background:#eef2f7!important;color:var(--ink)!important;box-shadow:none}
+.login-tabs button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important}
+.install-button{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important}
+.notice{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+input,select,textarea{border-color:#cbd5e1;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(244,81,30,.15)}
+.toast{background:#061426;color:white;border:1px solid rgba(255,255,255,.12)}
+.admin-alert{background:#fff7ed;border-color:var(--orange);color:#7c2d12}
+.team-chip{background:#eef2f7;color:var(--ink)}
+.reset-required-head{background:linear-gradient(145deg,#071a31,#020817)!important;color:white!important}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}.sidebar{border-radius:22px}.logo{width:64px;height:64px}.header h1{font-size:25px}
+}
+@media(max-width:520px){
+  .app{padding:12px}.header{gap:10px}.logo{width:58px;height:58px;border-radius:17px}
+  .body{padding:15px}.topline{padding:16px}.title{font-size:22px}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -354,7 +442,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v17";
+const storeKey="seah_wind_lms_live_supabase_v18";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -578,7 +666,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=17");
+ const registration=await navigator.serviceWorker.register("sw.js?v=18");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1360,7 +1448,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=17").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=18").catch(console.error));
 }
 
 boot();
