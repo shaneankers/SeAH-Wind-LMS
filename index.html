@@ -315,7 +315,7 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 .reset-required-body{padding:20px}
 
 
-/* ===== v18 SeAH Wind LMS Branding Refresh ===== */
+/* ===== v21 Professional Branding + Simplified Dashboard ===== */
 :root{
   --navy:#061426; --navy2:#0a1f3a; --navy3:#102d52;
   --card:#ffffff; --ink:#071426; --muted:#64748b; --line:#e2e8f0;
@@ -325,12 +325,11 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 }
 body{
   background:
-    radial-gradient(circle at 14% 4%,rgba(244,81,30,.22),transparent 28%),
-    radial-gradient(circle at 88% 12%,rgba(255,255,255,.08),transparent 28%),
+    radial-gradient(circle at 12% 0%,rgba(244,81,30,.18),transparent 26%),
     linear-gradient(135deg,var(--navy),#020817 62%,#020617);
   color:var(--ink);
 }
-.app{max-width:1460px;padding:18px}
+.app{max-width:1380px;padding:18px}
 .header{background:transparent;color:white;margin-bottom:16px;align-items:center}
 .logo{
   width:78px;height:78px;border-radius:20px;
@@ -340,11 +339,14 @@ body{
 .logo-main,.logo-sub{display:none}
 .header h1{font-size:31px;color:#fff}.sub{color:#dbeafe}
 #onlineStatus{background:#dcfce7!important;color:#14532d!important;border:1px solid rgba(22,163,74,.18)}
-.shell{grid-template-columns:300px 1fr;gap:20px}
-.sidebar{background:linear-gradient(180deg,#071a31,#031021)!important;color:white;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow)}
+.shell{grid-template-columns:280px 1fr;gap:20px}
+.sidebar{
+  background:linear-gradient(180deg,#071a31,#031021)!important;
+  color:white;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow);
+}
 .main,.login-wrap{background:#f8fafc!important;border:1px solid rgba(255,255,255,.55);box-shadow:var(--shadow)}
 .profile{background:#fff!important;border:1px solid rgba(255,255,255,.2)!important;color:var(--ink)!important;box-shadow:0 12px 34px rgba(2,8,23,.14)}
-.profile strong{font-size:19px;color:var(--ink)}
+.profile strong{font-size:20px;color:var(--ink)}
 .sidebar.player-mode .profile,.sidebar.admin-mode .profile{background:#fff!important;color:var(--ink)!important;text-align:left!important}
 .sidebar.player-mode .profile strong,.sidebar.admin-mode .profile strong{color:var(--ink)!important;font-size:24px!important;display:block!important}
 .mode-switch{background:rgba(255,255,255,.06);border-radius:18px;padding:6px}
@@ -361,15 +363,12 @@ body{
 }
 .card{border-radius:22px}.card-head{background:#fff!important;border-bottom:1px solid #edf2f7}
 .card-head strong,.item-title,.admin-row-title,.compact-name,.round-name,.player-list-name{color:var(--ink)}
-.stats{gap:14px}.stat{border-radius:20px;padding:18px}.stat .label{color:#64748b}.stat .value{color:var(--ink)}
 button{background:linear-gradient(135deg,var(--orange),var(--orange2));color:white;box-shadow:0 10px 22px rgba(244,81,30,.18)}
 button:hover{background:linear-gradient(135deg,var(--orange2),var(--orange))}
 button.secondary{background:#0f2747!important} button.ghost{background:#fff7ed!important;color:#9a3412!important;box-shadow:none}
 button.yellow{background:#f59e0b!important;color:#111827!important} button.green{background:#16a34a!important;color:white!important}
 button.red{background:#dc2626!important;color:white!important}
 .badge.orange{background:#ffedd5;color:#c2410c}.badge.dark{background:#071a31;color:#fff}
-.comp-header{background:linear-gradient(135deg,#071a31,#0a2748)!important;color:white!important;box-shadow:0 18px 44px rgba(2,8,23,.2)}
-.comp-header h2{color:white}
 .login-hero{background:linear-gradient(145deg,#071a31,#020817)!important;color:white!important}
 .big-logo{width:122px!important;height:122px!important;border-radius:28px!important;background:#061426 url("icon-512.png") center/cover no-repeat!important;box-shadow:0 22px 55px rgba(0,0,0,.38)}
 .big-logo .logo-main,.big-logo .logo-sub{display:none!important}
@@ -382,109 +381,80 @@ input,select,textarea{border-color:#cbd5e1;background:#fff;color:var(--ink)}
 input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(244,81,30,.15)}
 .toast{background:#061426;color:white;border:1px solid rgba(255,255,255,.12)}
 .admin-alert{background:#fff7ed;border-color:var(--orange);color:#7c2d12}
-.team-chip{background:#eef2f7;color:var(--ink)}
-.reset-required-head{background:linear-gradient(145deg,#071a31,#020817)!important;color:white!important}
+
+/* v21 dashboard */
+.dash-hero{
+  background:linear-gradient(135deg,#071a31,#061426 58%,#0a2748);
+  border-radius:22px;
+  padding:24px;
+  color:white;
+  display:grid;
+  grid-template-columns:1.2fr .8fr .8fr;
+  gap:18px;
+  margin-bottom:18px;
+  box-shadow:0 18px 48px rgba(2,8,23,.22);
+}
+.dash-hero-box{border-right:1px solid rgba(255,255,255,.14);padding-right:18px}
+.dash-hero-box:last-child{border-right:0}
+.dash-kicker{font-size:12px;color:#cbd5e1;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+.dash-value{font-size:34px;font-weight:1000;letter-spacing:-.04em;margin-top:4px;color:white}
+.dash-value.orange{color:var(--orange2)}
+.dash-detail{font-size:13px;color:#cbd5e1;margin-top:5px}
+.dash-main-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-bottom:18px}
+.dash-card{
+  background:#fff;border:1px solid var(--line);border-radius:22px;
+  padding:20px;box-shadow:0 12px 28px rgba(2,8,23,.05);
+}
+.dash-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.dash-title{font-size:18px;font-weight:1000;color:var(--ink);display:flex;align-items:center;gap:10px}
+.clean-icon{
+  width:40px;height:40px;border-radius:14px;background:#fff7ed;
+  border:1px solid #fed7aa;color:var(--orange);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:1000;font-size:18px;line-height:1;
+}
+.action-grid-clean{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.action-clean{
+  border:1px solid var(--line);border-radius:16px;background:#fff;
+  padding:15px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:.15s ease;
+}
+.action-clean:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(2,8,23,.08)}
+.action-clean strong{display:block;color:var(--ink)}
+.action-clean span{font-size:12px;color:#64748b}
+.missing-list{display:flex;flex-direction:column;gap:10px}
+.missing-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  border-bottom:1px solid #edf2f7;padding:10px 0;
+}
+.missing-row:last-child{border-bottom:0}
+.avatar-clean{
+  width:36px;height:36px;border-radius:12px;background:#f1f5f9;color:#071426;
+  display:flex;align-items:center;justify-content:center;font-weight:1000;
+}
+.missing-left{display:flex;align-items:center;gap:10px}
+.missing-name{font-weight:950;color:var(--ink)}
+.missing-sub{font-size:12px;color:#64748b}
+.stats-clean{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;
+}
+.stat-clean{
+  background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;
+  box-shadow:0 12px 28px rgba(2,8,23,.05);display:flex;gap:14px;align-items:center;
+}
+.stat-clean .num{font-size:28px;font-weight:1000;color:var(--ink)}
+.stat-clean .lbl{font-size:12px;font-weight:900;color:#64748b}
+@media(max-width:1050px){
+ .dash-hero,.dash-main-grid{grid-template-columns:1fr}
+ .dash-hero-box{border-right:0;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:14px}
+ .dash-hero-box:last-child{border-bottom:0}
+ .stats-clean{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+ .action-grid-clean{grid-template-columns:1fr}
+ .dash-value{font-size:28px}
+}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{border-radius:22px}.logo{width:64px;height:64px}.header h1{font-size:25px}}
 @media(max-width:520px){.app{padding:12px}.header{gap:10px}.logo{width:58px;height:58px;border-radius:17px}.body{padding:15px}.topline{padding:16px}.title{font-size:22px}}
-
-
-/* ===== v19 Dashboard Layout Upgrade ===== */
-.app{max-width:1500px}
-.dashboard-hero{background:linear-gradient(135deg,#071a31,#061426 58%,#0a2748);border-radius:20px;padding:22px;color:white;display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:18px;margin-bottom:18px;box-shadow:0 18px 48px rgba(2,8,23,.22)}
-.hero-block{border-right:1px solid rgba(255,255,255,.16);padding-right:16px;display:flex;align-items:center;gap:16px}.hero-block:last-child{border-right:0}
-.hero-icon{width:70px;height:70px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);font-size:32px}
-.hero-kicker{font-size:12px;color:#cbd5e1;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.hero-value{font-size:30px;font-weight:1000;letter-spacing:-.04em;margin-top:3px;color:#fff}.hero-value.orange{color:var(--orange2)}.hero-detail{font-size:13px;color:#cbd5e1;margin-top:4px}
-.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
-.metric-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;gap:14px;align-items:center;box-shadow:0 12px 28px rgba(2,8,23,.05)}
-.metric-icon{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;color:var(--navy);font-size:24px;font-weight:1000}.metric-card.orange .metric-icon{background:#ffedd5;color:#c2410c}.metric-card.green .metric-icon{background:#dcfce7;color:#166534}.metric-card.red .metric-icon{background:#fee2e2;color:#991b1b}
-.metric-value{font-size:27px;font-weight:1000;letter-spacing:-.04em;color:var(--ink)}.metric-label{font-size:12px;color:#64748b;font-weight:800}
-.dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 12px 28px rgba(2,8,23,.05)}
-.panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:1000;color:var(--ink);font-size:17px;margin-bottom:16px}
-.progress-row{margin-bottom:16px}.progress-top{display:flex;justify-content:space-between;font-size:13px;font-weight:900;margin-bottom:7px;color:var(--ink)}.progress-track{height:10px;background:#eef2f7;border-radius:999px;overflow:hidden}.progress-fill{height:100%;background:#071a31;border-radius:999px}
-.admin-action-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}.action-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s ease}.action-card:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(2,8,23,.08)}
-.action-icon{width:44px;height:44px;border-radius:14px;background:#fff7ed;color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:24px}.action-title{font-weight:1000;color:var(--ink);font-size:14px}.action-sub{font-size:12px;color:#64748b;margin-top:2px}
-.rich-list{display:flex;flex-direction:column;gap:10px}.rich-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #edf2f7}.rich-row:last-child{border-bottom:0}.rich-left{display:flex;align-items:center;gap:10px;min-width:0}.rich-avatar{width:38px;height:38px;border-radius:12px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:18px}.rich-name{font-weight:900;color:var(--ink)}.rich-sub{font-size:12px;color:#64748b}.link-orange{color:var(--orange);font-weight:900;font-size:13px;margin-top:14px;display:inline-block;cursor:pointer}
-.player-pick-hero{background:linear-gradient(135deg,#071a31,#061426 60%,#0a2748);border-radius:22px;color:white;padding:22px;margin-bottom:18px;display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.player-pick-hero h2{margin:0;font-size:30px;letter-spacing:-.04em}.player-pick-box{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:16px}
-@media(max-width:1050px){.dashboard-hero,.dashboard-grid,.player-pick-hero{grid-template-columns:1fr}.hero-block{border-right:0;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:14px}.hero-block:last-child{border-bottom:0}.metric-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.metric-grid,.admin-action-cards{grid-template-columns:1fr}.dashboard-hero{padding:16px}.hero-value{font-size:25px}}
-
-
-/* ===== v20 Dashboard Cleanup ===== */
-.mode-switch button::before,
-.nav button::before{
-  margin-right:8px;
-  color:inherit;
-}
-.mode-switch button:first-child::before{content:"♢";}
-.mode-switch button:nth-child(2)::before{content:"○";}
-.nav button{font-size:15px}
-.dashboard-hero.v20{
-  grid-template-columns:1.15fr 1fr 1fr;
-}
-.icon-line{
-  width:46px;height:46px;border-radius:14px;
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid #ff6a2a;
-  color:#f4511e;
-  font-size:23px;
-  font-weight:1000;
-  background:#fff7ed;
-  flex:0 0 auto;
-}
-.hero-line-icon{
-  width:70px;height:70px;border-radius:999px;
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid rgba(255,255,255,.7);
-  color:white;
-  font-size:32px;
-  font-weight:1000;
-  background:rgba(255,255,255,.07);
-}
-.clean-action-card .action-icon{
-  background:#fff7ed;
-  border:1px solid #fed7aa;
-  color:#f4511e;
-  font-size:22px;
-}
-.clean-action-card .action-title{
-  color:#071426;
-}
-.dashboard-grid.clean{
-  grid-template-columns:1.05fr .95fr;
-}
-.panel-card.compact-panel{
-  min-height:unset;
-}
-.rich-avatar.orange-icon{
-  background:#fff7ed;
-  border:1px solid #fed7aa;
-  color:#f4511e;
-  font-weight:1000;
-}
-.metric-card .metric-icon{
-  background:#fff7ed!important;
-  border:1px solid #fed7aa;
-  color:#f4511e!important;
-}
-.metric-card.green .metric-icon{
-  background:#ecfdf5!important;
-  border-color:#bbf7d0;
-  color:#16a34a!important;
-}
-.metric-card.red .metric-icon{
-  background:#fef2f2!important;
-  border-color:#fecaca;
-  color:#dc2626!important;
-}
-.dashboard-secondary-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:18px;
-  margin-top:18px;
-}
-@media(max-width:1050px){
- .dashboard-hero.v20,.dashboard-grid.clean,.dashboard-secondary-grid{grid-template-columns:1fr}
-}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -526,7 +496,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v20";
+const storeKey="seah_wind_lms_live_supabase_v21";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -653,72 +623,54 @@ function dashboard(){
  const paidPlayers=paid();
  const alivePlayers=alive();
  const submitted=Math.max(0,alivePlayers.length-missing.length);
- const pickPct=alivePlayers.length?Math.round((submitted/alivePlayers.length)*100):0;
- const paidPct=approved.length?Math.round((paidPlayers.length/approved.length)*100):0;
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
- <div class="dashboard-hero v20">
-  <div class="hero-block">
-   <div class="hero-line-icon">⌾</div>
-   <div><div class="hero-kicker">Current Round</div><div class="hero-value">Round ${state.round}</div><div class="hero-detail">Deadline: ${state.deadline}</div></div>
-  </div>
-  <div class="hero-block">
-   <div><div class="hero-kicker">Prize Pot</div><div class="hero-value orange">£${pot()}</div><div class="hero-detail">${paidPlayers.length} paid entries</div></div>
-  </div>
-  <div class="hero-block">
-   <div><div class="hero-kicker">Pick Status</div><div class="hero-value">${submitted}/${alivePlayers.length}</div><div class="hero-detail">${missing.length} still to pick</div></div>
-  </div>
+ <div class="dash-hero">
+   <div class="dash-hero-box">
+     <div class="dash-kicker">Current Round</div>
+     <div class="dash-value">Round ${state.round}</div>
+     <div class="dash-detail">Deadline: ${state.deadline}</div>
+   </div>
+   <div class="dash-hero-box">
+     <div class="dash-kicker">Prize Pot</div>
+     <div class="dash-value orange">£${pot()}</div>
+     <div class="dash-detail">${paidPlayers.length} paid ${paidPlayers.length===1?'entry':'entries'}</div>
+   </div>
+   <div class="dash-hero-box">
+     <div class="dash-kicker">Still Standing</div>
+     <div class="dash-value">${alivePlayers.length}</div>
+     <div class="dash-detail">${approved.length} approved players</div>
+   </div>
  </div>
 
- <div class="metric-grid">
-  <div class="metric-card"><div class="metric-icon">♙</div><div><div class="metric-value">${approved.length}</div><div class="metric-label">Players</div></div></div>
-  <div class="metric-card green"><div class="metric-icon">✓</div><div><div class="metric-value">${alivePlayers.length}</div><div class="metric-label">Still Standing</div></div></div>
-  <div class="metric-card orange"><div class="metric-icon">£</div><div><div class="metric-value">${paidPlayers.length}</div><div class="metric-label">Paid</div></div></div>
-  <div class="metric-card red"><div class="metric-icon">!</div><div><div class="metric-value">${missing.length}</div><div class="metric-label">Missing Picks</div></div></div>
+ <div class="stats-clean">
+   <div class="stat-clean"><div class="clean-icon">P</div><div><div class="num">${approved.length}</div><div class="lbl">Players</div></div></div>
+   <div class="stat-clean"><div class="clean-icon">£</div><div><div class="num">${paidPlayers.length}</div><div class="lbl">Paid</div></div></div>
+   <div class="stat-clean"><div class="clean-icon">!</div><div><div class="num">${missing.length}</div><div class="lbl">Missing Picks</div></div></div>
  </div>
 
- <div class="dashboard-grid clean">
-  <div class="panel-card compact-panel">
-   <div class="panel-title"><span><span class="icon-line" style="display:inline-flex;width:34px;height:34px;font-size:16px;margin-right:8px">R</span>Round Progress</span><span class="badge orange">Round ${state.round}</span></div>
-   <div class="progress-row">
-    <div class="progress-top"><span>Picks Submitted</span><span>${submitted} / ${alivePlayers.length}</span></div>
-    <div class="progress-track"><div class="progress-fill" style="width:${pickPct}%"></div></div>
+ <div class="dash-main-grid">
+   <div class="dash-card">
+     <div class="dash-card-head">
+       <div class="dash-title"><span class="clean-icon">!</span>Missing Picks</div>
+       <span class="badge ${missing.length?'red':'green'}">${missing.length}</span>
+     </div>
+     <div class="missing-list">
+       ${missing.length?missing.map(p=>`<div class="missing-row"><div class="missing-left"><div class="avatar-clean">${p.name.slice(0,1).toUpperCase()}</div><div><div class="missing-name">${p.name}</div><div class="missing-sub">Round ${state.round}</div></div></div><span class="badge red">Missing</span></div>`).join(""):`<div class="notice">Everyone has picked.</div>`}
+     </div>
    </div>
-   <div class="progress-row">
-    <div class="progress-top"><span>Paid Players</span><span>${paidPlayers.length} / ${approved.length}</span></div>
-    <div class="progress-track"><div class="progress-fill" style="width:${paidPct}%"></div></div>
-   </div>
-   <div class="rich-row"><div><div class="rich-name">Deadline</div><div class="rich-sub">Pick cut-off time</div></div><span class="badge orange">${state.deadline}</span></div>
-  </div>
 
-  <div class="panel-card compact-panel">
-   <div class="panel-title"><span><span class="icon-line" style="display:inline-flex;width:34px;height:34px;font-size:16px;margin-right:8px">A</span>Admin Actions</span></div>
-   <div class="admin-action-cards">
-    <div class="action-card clean-action-card" onclick="notifyUnpaid()"><div class="action-icon">✉</div><div><div class="action-title">Unpaid Players</div><div class="action-sub">Send payment reminder</div></div></div>
-    <div class="action-card clean-action-card" onclick="notifyMissingPicks()"><div class="action-icon">⌁</div><div><div class="action-title">Missing Picks</div><div class="action-sub">Send pick reminder</div></div></div>
-    <div class="action-card clean-action-card" onclick="notifyWinner()"><div class="action-icon">♕</div><div><div class="action-title">Winner</div><div class="action-sub">Send announcement</div></div></div>
-    <div class="action-card clean-action-card" onclick="notifyRollover()"><div class="action-icon">↻</div><div><div class="action-title">Rollover</div><div class="action-sub">Send announcement</div></div></div>
+   <div class="dash-card">
+     <div class="dash-card-head">
+       <div class="dash-title"><span class="clean-icon">A</span>Admin Actions</div>
+     </div>
+     <div class="action-grid-clean">
+       <div class="action-clean" onclick="notifyUnpaid()"><div class="clean-icon">£</div><div><strong>Unpaid Players</strong><span>Send payment reminder</span></div></div>
+       <div class="action-clean" onclick="notifyMissingPicks()"><div class="clean-icon">!</div><div><strong>Missing Picks</strong><span>Send pick reminder</span></div></div>
+       <div class="action-clean" onclick="notifyWinner()"><div class="clean-icon">W</div><div><strong>Winner</strong><span>Send announcement</span></div></div>
+       <div class="action-clean" onclick="notifyRollover()"><div class="clean-icon">R</div><div><strong>Rollover</strong><span>Send announcement</span></div></div>
+     </div>
    </div>
-  </div>
- </div>
-
- <div class="dashboard-secondary-grid">
-  <div class="panel-card">
-   <div class="panel-title"><span>Status Summary</span></div>
-   <div class="rich-list">
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">✓</div><div><div class="rich-name">Competition active</div><div class="rich-sub">Competition #${state.competition} · Round ${state.round}</div></div></div></div>
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">P</div><div><div class="rich-name">${pending.length} pending approval</div><div class="rich-sub">${approved.length} approved players</div></div></div></div>
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">£</div><div><div class="rich-name">Prize pot £${pot()}</div><div class="rich-sub">${paidPlayers.length} paid entries</div></div></div></div>
-   </div>
-  </div>
-
-  <div class="panel-card">
-   <div class="panel-title"><span>Missing Picks</span><span class="badge red">${missing.length}</span></div>
-   <div class="rich-list">
-    ${missing.length?missing.slice(0,5).map(p=>`<div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">○</div><div><div class="rich-name">${p.name}</div><div class="rich-sub">Round ${state.round}</div></div></div><span class="badge red">Missing</span></div>`).join(""):`<div class="notice">Everyone has picked.</div>`}
-   </div>
-   ${missing.length?`<span class="link-orange" onclick="setPage('round')">View round picks ›</span>`:""}
-  </div>
  </div>`;
 }
 function players(){
@@ -771,27 +723,10 @@ function round(){
  </div>
  <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button></div>`;
 }
-function myPick(){
- const p=currentPlayer(),selected=window.tempPick||p.pick||"";
- if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
- return `<div class="player-pick-hero">
-  <div><div class="hero-kicker">Player Dashboard</div><h2>Round ${state.round}</h2><div class="hero-detail">Deadline: ${state.deadline}</div><div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><span class="badge ${p.paid?'green':'red'}">${p.paid?'Paid':'Not Paid'}</span><span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Out'}</span><span class="badge ${p.pick?'green':'orange'}">${p.pick?'Pick Submitted':'Awaiting Pick'}</span></div></div>
-  <div class="player-pick-box"><div class="hero-kicker">Current Pick</div><div class="hero-value">${p.pick||"No team selected"}</div><div class="hero-detail">Prize pot: £${pot()} · ${alive().length} remaining</div></div>
- </div>
- <div class="metric-grid">
-  <div class="metric-card"><div class="metric-icon">👥</div><div><div class="metric-value">${state.players.filter(x=>x.approved).length}</div><div class="metric-label">Players</div></div></div>
-  <div class="metric-card green"><div class="metric-icon">✓</div><div><div class="metric-value">${alive().length}</div><div class="metric-label">Remaining</div></div></div>
-  <div class="metric-card orange"><div class="metric-icon">£</div><div><div class="metric-value">£${pot()}</div><div class="metric-label">Pot</div></div></div>
-  <div class="metric-card ${p.pick?'green':'red'}"><div class="metric-icon">⚽</div><div><div class="metric-value">${p.pick?'Yes':'No'}</div><div class="metric-label">Pick Submitted</div></div></div>
- </div>
- <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body">
-  ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
-  <div class="pick-grid">
-   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${state.leagues[window.tempLeague||teamLeague(selected)].map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
-  </div>${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}<br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
- </div></div>`;
-}
+function myPick(){const p=currentPlayer(),selected=window.tempPick||p.pick||"";if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;return `<div class="stats five"><div class="stat"><div class="label">Players</div><div class="value">${state.players.filter(x=>x.approved).length}</div></div><div class="stat"><div class="label">Remaining</div><div class="value">${alive().length}</div></div><div class="stat"><div class="label">Alive</div><div class="value">${p.alive?'Yes':'No'}</div></div><div class="stat"><div class="label">Pot</div><div class="value">£${pot()}</div></div><div class="stat"><div class="label">Round</div><div class="value">${state.round}</div></div></div><div class="card"><div class="card-head"><strong>Player Dashboard</strong></div><div class="card-body list"><div class="item"><div class="item-title">Payment</div><span class="badge ${p.paid?'green':'red'}">${p.paid?'Paid':'Not Paid'}</span></div><div class="item"><div class="item-title">Team Selection</div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Team Selected':'Awaiting Selection'}</span></div></div></div><div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body"><div class="item" style="margin-bottom:12px"><div><div class="item-title">Current Pick</div><div class="tiny">${p.pick||"No team selected"}</div></div><span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Submitted':'Not Submitted'}</span></div>${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}<div class="pick-grid">
+  <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
+  <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${state.leagues[window.tempLeague||teamLeague(selected)].map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
+</div>${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}<br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button></div></div>`}
 function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${t}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
 function competition(){return `<div class="comp-header"><h2>Competition #${state.competition}</h2><div>Rollover ${state.rollover||0} · Round ${state.round} · Prize Pot £${pot()}</div><div class="comp-meta"><span class="badge dark">${alive().length} standing</span><span class="badge dark">${out().length} eliminated</span></div></div><div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${alive().length}</span></div><div class="card-body list">${alive().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div><div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${out().length}</span></div><div class="card-body list">${out().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`}
 function playerHall(){const r=defendingChampion(),champ=state.players.find(p=>p.name===r);return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">🏆 ${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${state.champions.length?state.champions.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">🏆 ${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`}
@@ -840,7 +775,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=20");
+ const registration=await navigator.serviceWorker.register("sw.js?v=21");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1622,7 +1557,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=20").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=21").catch(console.error));
 }
 
 boot();
