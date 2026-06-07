@@ -720,7 +720,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v25";
+const storeKey="seah_wind_lms_live_supabase_v26";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -778,6 +778,62 @@ function noteText(key, extra={}){
  const data={entryFee:state.entryFee,round:state.round,deadline:state.deadline,competition:state.competition,winner:extra.winner||defendingChampion()};
  return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
 }
+
+async function syncUsersFromSupabase(){
+ try{
+  if(!onlineReady)return;
+  const {data,error}=await supabaseClient
+   .from("app_users")
+   .select("id,username,display_name,role,approved,notifications_enabled")
+   .eq("role","player")
+   .order("display_name",{ascending:true});
+  if(error)throw error;
+  if(!Array.isArray(data))return;
+
+  data.forEach(u=>{
+   let p=state.players.find(x=>x.id===u.id);
+   if(!p)p=state.players.find(x=>(x.username||"").toLowerCase()===(u.username||"").toLowerCase());
+
+   if(!p){
+    p={
+     id:u.id,
+     username:u.username,
+     name:u.display_name||u.username,
+     approved:!!u.approved,
+     paid:false,
+     alive:true,
+     wins:0,
+     pick:"",
+     locked:false,
+     result:"pending",
+     previous:[],
+     outRound:null,
+     outPick:null,
+     notifications:u.notifications_enabled!==false
+    };
+    state.players.push(p);
+   }else{
+    p.id=u.id;
+    p.username=u.username;
+    p.name=u.display_name||p.name||u.username;
+    p.approved=!!u.approved;
+    if(typeof p.paid==="undefined")p.paid=false;
+    if(typeof p.alive==="undefined")p.alive=true;
+    if(typeof p.wins==="undefined")p.wins=0;
+    if(typeof p.pick==="undefined")p.pick="";
+    if(typeof p.locked==="undefined")p.locked=false;
+    if(typeof p.result==="undefined")p.result="pending";
+    if(!Array.isArray(p.previous))p.previous=[];
+    if(typeof p.notifications==="undefined")p.notifications=u.notifications_enabled!==false;
+   }
+  });
+
+  localStorage.setItem(storeKey,JSON.stringify(state));
+ }catch(e){
+  console.warn("Could not sync users from Supabase",e);
+ }
+}
+
 function renderAuth(){
  const login=document.getElementById("loginScreen"),app=document.getElementById("appScreen");
  if(authUser&&authUser.must_reset_password){
@@ -830,6 +886,13 @@ function switchAdminView(view){
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
+ if(authUser&&authUser.role==="admin"&&onlineReady&&!window.__syncingUsers){
+  window.__syncingUsers=true;
+  syncUsersFromSupabase().then(()=>{
+   window.__syncingUsers=false;
+   if(page==="players"||page==="dashboard")render();
+  }).catch(()=>{window.__syncingUsers=false;});
+ }
  ensureActivityLog();
  if(!state.adminAlerts)state.adminAlerts=[];
  state.players.forEach(p=>{
@@ -1087,7 +1150,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=25");
+ const registration=await navigator.serviceWorker.register("sw.js?v=26");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1261,8 +1324,41 @@ function toggleEditPanel(i){
  el.classList.toggle("open");
 }
 
-function approvePlayer(i){state.players[i].approved=true;addActivity("player",state.players[i].name+" approved","New player approved");toast(state.players[i].name+" approved.");save()}
-function approveAndPay(i){state.players[i].approved=true;state.players[i].paid=true;addActivity("player",state.players[i].name+" approved and paid","Player approved and marked paid");toast(state.players[i].name+" approved and marked paid.");save()}
+async function approvePlayer(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ try{
+  if(p.id){
+   const {error}=await supabaseClient.from("app_users").update({approved:true}).eq("id",p.id);
+   if(error)throw error;
+  }
+  p.approved=true;
+  if(typeof addActivity==="function")addActivity("player",p.name+" approved","New player approved");
+  toast(p.name+" approved.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Could not approve player: "+(e.message||"unknown error"));
+ }
+}
+async function approveAndPay(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ try{
+  if(p.id){
+   const {error}=await supabaseClient.from("app_users").update({approved:true}).eq("id",p.id);
+   if(error)throw error;
+  }
+  p.approved=true;
+  p.paid=true;
+  if(typeof addActivity==="function")addActivity("player",p.name+" approved and paid","Player approved and marked paid");
+  toast(p.name+" approved and marked paid.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Could not approve player: "+(e.message||"unknown error"));
+ }
+}
 function rejectPlayer(i){if(confirm("Remove this player?")){state.players.splice(i,1);save()}}
 function togglePaid(i){
  const p=state.players[i];
@@ -1878,7 +1974,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=25").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=26").catch(console.error));
 }
 
 boot();
