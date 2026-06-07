@@ -497,6 +497,55 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
  .body{padding:15px}.topline{padding:16px}
 }
 
+
+/* ===== v23 Specific Polish ===== */
+.admin-hero-cell .hero-sub{display:none}
+.action-pro{
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  color:white!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+}
+.action-pro strong{color:white!important}
+.action-pro span{color:#cbd5e1!important}
+.action-pro .icon-wrap{
+  background:rgba(255,255,255,.08)!important;
+  border-color:rgba(255,255,255,.16)!important;
+  color:#ff6a2a!important;
+}
+.comp-header{
+  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  color:white!important;
+  box-shadow:0 18px 48px rgba(2,8,23,.22)!important;
+}
+.comp-header h2{color:white!important}
+.comp-header .badge.dark{
+  background:rgba(255,255,255,.1)!important;
+  color:white!important;
+  border:1px solid rgba(255,255,255,.16)!important;
+}
+.activity-list{display:flex;flex-direction:column;gap:0}
+.activity-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 0;border-bottom:1px solid #edf2f7;
+}
+.activity-row:last-child{border-bottom:0}
+.activity-left{display:flex;align-items:center;gap:10px;min-width:0}
+.activity-icon{
+  width:38px;height:38px;border-radius:13px;background:#fff7ed;
+  border:1px solid #fed7aa;color:var(--orange);
+  display:flex;align-items:center;justify-content:center;font-weight:1000;
+}
+.activity-main{font-weight:950;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.activity-sub{font-size:12px;color:#64748b}
+.activity-time{font-size:12px;color:#64748b;white-space:nowrap}
+.activity-toggle{
+  margin-top:12px;
+  color:var(--orange);
+  font-weight:950;
+  cursor:pointer;
+  display:inline-flex;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -537,7 +586,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v22";
+const storeKey="seah_wind_lms_live_supabase_v23";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -647,6 +696,7 @@ function switchAdminView(view){
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
+ ensureActivityLog();
  if(!state.adminAlerts)state.adminAlerts=[];
  state.players.forEach(p=>{
   if(p.locked && !p.pick) p.locked=false;
@@ -673,6 +723,40 @@ function appIcon(name){
  return icons[name]||icons.alert;
 }
 
+
+function ensureActivityLog(){
+ if(!state.activityLog)state.activityLog=[];
+}
+function addActivity(type,title,detail){
+ ensureActivityLog();
+ state.activityLog.unshift({
+  type:type||"info",
+  title:title||"Activity",
+  detail:detail||"",
+  time:new Date().toISOString()
+ });
+ state.activityLog=state.activityLog.slice(0,50);
+}
+function activityIcon(type){
+ const map={pick:"ball",paid:"money",player:"users",round:"trophy",notify:"bell",info:"check"};
+ return appIcon(map[type]||"check");
+}
+function activityTimeLabel(iso){
+ if(!iso)return "";
+ const diff=Date.now()-new Date(iso).getTime();
+ const mins=Math.max(0,Math.floor(diff/60000));
+ if(mins<1)return "Now";
+ if(mins<60)return mins+"m ago";
+ const hrs=Math.floor(mins/60);
+ if(hrs<24)return hrs+"h ago";
+ const days=Math.floor(hrs/24);
+ return days+"d ago";
+}
+function toggleActivityList(){
+ window.showAllActivity=!window.showAllActivity;
+ render();
+}
+
 function dashboard(){
  const pending=state.players.filter(p=>!p.approved);
  const unpaid=state.players.filter(p=>p.approved&&!p.paid);
@@ -680,20 +764,22 @@ function dashboard(){
  const approved=state.players.filter(p=>p.approved);
  const paidPlayers=paid();
  const alivePlayers=alive();
+ ensureActivityLog();
+ const visibleActivities=(state.activityLog||[]).slice(0,window.showAllActivity?50:4);
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
  <div class="admin-hero">
   <div class="admin-hero-cell">
    <div class="icon-wrap navy">${appIcon('trophy')}</div>
-   <div><div class="kicker">Current Round</div><div class="hero-num">Round ${state.round}</div><div class="hero-sub">Deadline: ${state.deadline}</div></div>
+   <div><div class="kicker">Current Round</div><div class="hero-num">Round ${state.round}</div></div>
   </div>
   <div class="admin-hero-cell">
    <div class="icon-wrap navy">${appIcon('money')}</div>
-   <div><div class="kicker">Prize Pot</div><div class="hero-num orange">£${pot()}</div><div class="hero-sub">Competition #${state.competition}</div></div>
+   <div><div class="kicker">Prize Pot</div><div class="hero-num orange">£${pot()}</div></div>
   </div>
   <div class="admin-hero-cell">
    <div class="icon-wrap navy">${appIcon('users')}</div>
-   <div><div class="kicker">Still Standing</div><div class="hero-num">${alivePlayers.length}</div><div class="hero-sub">${approved.length} approved players</div></div>
+   <div><div class="kicker">Still Standing</div><div class="hero-num">${alivePlayers.length}</div></div>
   </div>
  </div>
 
@@ -706,10 +792,11 @@ function dashboard(){
 
  <div class="dash-grid">
   <div class="pro-card">
-   <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('alert')}</span>Missing Picks</div><span class="badge ${missing.length?'red':'green'}">${missing.length}</span></div>
-   <div class="missing-pro-list">
-    ${missing.length?missing.map(p=>`<div class="missing-pro-row"><div class="missing-left"><div class="player-initial">${p.name.slice(0,1).toUpperCase()}</div><div><div class="missing-name">${p.name}</div><div class="missing-sub">Round ${state.round}</div></div></div><span class="badge red">Missing</span></div>`).join(""):`<div class="notice">Everyone has picked.</div>`}
+   <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('check')}</span>Recent Activity</div><span class="badge orange">${state.activityLog.length}</span></div>
+   <div class="activity-list">
+    ${visibleActivities.length?visibleActivities.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${a.title}</div><div class="activity-sub">${a.detail||""}</div></div></div><div class="activity-time">${activityTimeLabel(a.time)}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`}
    </div>
+   ${(state.activityLog||[]).length>4?`<span class="activity-toggle" onclick="toggleActivityList()">${window.showAllActivity?'Show less':'View full activity list'} ›</span>`:""}
   </div>
 
   <div class="pro-card">
@@ -854,7 +941,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=22");
+ const registration=await navigator.serviceWorker.register("sw.js?v=23");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1028,13 +1115,14 @@ function toggleEditPanel(i){
  el.classList.toggle("open");
 }
 
-function approvePlayer(i){state.players[i].approved=true;toast(state.players[i].name+" approved.");save()}
-function approveAndPay(i){state.players[i].approved=true;state.players[i].paid=true;toast(state.players[i].name+" approved and marked paid.");save()}
+function approvePlayer(i){state.players[i].approved=true;addActivity("player",state.players[i].name+" approved","New player approved");toast(state.players[i].name+" approved.");save()}
+function approveAndPay(i){state.players[i].approved=true;state.players[i].paid=true;addActivity("player",state.players[i].name+" approved and paid","Player approved and marked paid");toast(state.players[i].name+" approved and marked paid.");save()}
 function rejectPlayer(i){if(confirm("Remove this player?")){state.players.splice(i,1);save()}}
 function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
  p.paid=!p.paid;
+ addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status updated");
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
  save();
 }
@@ -1103,7 +1191,7 @@ async function resetPlayerPassword(i){
  }
 }
 
-function setPick(i,v){state.players[i].pick=v;save()}
+function setPick(i,v){const p=state.players[i];const old=p.pick;p.pick=v;if(v&&v!==old)addActivity("pick",p.name+" picked "+v,"Admin updated Round "+state.round+" pick");save()}
 function setResult(i,v){state.players[i].result=v;save()}
 function chooseTempPick(v){window.tempPick=v;render()}
 function confirmPlayerPick(){
@@ -1116,6 +1204,7 @@ function confirmPlayerPick(){
  if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
  p.pick=pick;
  p.locked=true;
+ addActivity("pick",p.name+" picked "+pick,"Round "+state.round+" pick submitted");
  window.tempPick="";
  toast("Pick submitted and locked.");
  save();
@@ -1165,6 +1254,7 @@ function processRound(){
  if(s.length===1){
   s[0].wins++;
   state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
+  addActivity("round","Winner found: "+s[0].name,"Competition #"+state.competition);
   addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
   alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
   toast("Winner: "+s[0].name);
@@ -1182,11 +1272,13 @@ function processRound(){
    p.locked=false;
    p.result="pending";
   });
+  addActivity("round","Rollover "+state.rollover+" started","Everyone is back in and payment is due again");
   addAdminAlert("Rollover started","Rollover "+state.rollover+" has started. Admin action needed: send rollover notification and collect payment again from everyone who is back in.");
   alert("Rollover started.\n\nAdmin action needed: collect payment again from everyone who is back in.");
   toast("Rollover "+state.rollover+" started. Everyone is back in and payment is due again.");
  }else{
   state.round++;
+  addActivity("round","Round processed","Moved to Round "+state.round);
   toast("Round processed.");
  }
 
@@ -1309,6 +1401,7 @@ async function notifyUnpaid(){
  if(!targets.length)return toast("No unpaid players to notify.");
  try{
   const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("unpaid"));
+  addActivity("notify","Payment reminders sent","Devices sent: "+r.sent+(r.failed?"; failed: "+r.failed:""));
   toast("Payment reminder sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
  }catch(e){
   toast("Payment reminder failed: "+(e.message||"unknown error"));
@@ -1320,6 +1413,7 @@ async function notifyMissingPicks(){
  if(!targets.length)return toast("No missing picks to notify.");
  try{
   const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("missingPick"));
+  addActivity("notify","Pick reminders sent","Devices sent: "+r.sent+(r.failed?"; failed: "+r.failed:""));
   toast("Pick reminder sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
  }catch(e){
   toast("Pick reminder failed: "+(e.message||"unknown error"));
@@ -1330,6 +1424,7 @@ async function notifyWinner(){
  try{
   const targets=state.players.filter(p=>p.approved&&p.notifications!==false);
   const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("winner"));
+  addActivity("notify","Winner announcement sent","Devices sent: "+r.sent+(r.failed?"; failed: "+r.failed:""));
   toast("Winner announcement sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
  }catch(e){
   toast("Winner announcement failed: "+(e.message||"unknown error"));
@@ -1340,6 +1435,7 @@ async function notifyRollover(){
  try{
   const targets=state.players.filter(p=>p.approved&&p.notifications!==false);
   const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("rollover"));
+  addActivity("notify","Rollover announcement sent","Devices sent: "+r.sent+(r.failed?"; failed: "+r.failed:""));
   toast("Rollover announcement sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
  }catch(e){
   toast("Rollover announcement failed: "+(e.message||"unknown error"));
@@ -1636,7 +1732,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=22").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=23").catch(console.error));
 }
 
 boot();
