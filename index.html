@@ -546,6 +546,68 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   display:inline-flex;
 }
 
+
+/* ===== v24 Stat Cards + Competition Header Polish ===== */
+.stat-pro{
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  color:white!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  box-shadow:0 16px 34px rgba(2,8,23,.18)!important;
+}
+.stat-pro .num{color:white!important}
+.stat-pro .lbl{color:#cbd5e1!important}
+.stat-pro .icon-wrap{
+  background:rgba(255,255,255,.08)!important;
+  border-color:rgba(255,255,255,.16)!important;
+  color:#ff6a2a!important;
+}
+.stat-pro .icon-wrap.green{color:#22c55e!important}
+.stat-pro .icon-wrap.red{color:#ff5a5f!important}
+
+.comp-header{
+  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  color:white!important;
+  padding:24px!important;
+  border-radius:22px!important;
+  box-shadow:0 18px 48px rgba(2,8,23,.22)!important;
+}
+.comp-header h2{
+  color:white!important;
+  font-size:30px!important;
+  margin:0 0 12px!important;
+}
+.comp-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin-top:14px;
+}
+.comp-summary-pill{
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:16px;
+  padding:13px 14px;
+}
+.comp-summary-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  font-weight:950;
+  color:#cbd5e1;
+}
+.comp-summary-value{
+  color:white;
+  font-size:22px;
+  font-weight:1000;
+  margin-top:4px;
+}
+@media(max-width:800px){
+  .comp-summary-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .comp-summary-grid{grid-template-columns:1fr}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -586,7 +648,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v23";
+const storeKey="seah_wind_lms_live_supabase_v24";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -894,7 +956,21 @@ function myPick(){
  </div></div>`;
 }
 function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${t}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
-function competition(){return `<div class="comp-header"><h2>Competition #${state.competition}</h2><div>Rollover ${state.rollover||0} · Round ${state.round} · Prize Pot £${pot()}</div><div class="comp-meta"><span class="badge dark">${alive().length} standing</span><span class="badge dark">${out().length} eliminated</span></div></div><div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${alive().length}</span></div><div class="card-body list">${alive().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div><div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${out().length}</span></div><div class="card-body list">${out().map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`}
+function competition(){
+ const standing=alive();
+ const eliminated=out();
+ return `<div class="comp-header">
+   <h2>Competition #${state.competition}</h2>
+   <div class="comp-summary-grid">
+    <div class="comp-summary-pill"><div class="comp-summary-label">Round</div><div class="comp-summary-value">${state.round}</div></div>
+    <div class="comp-summary-pill"><div class="comp-summary-label">Rollover</div><div class="comp-summary-value">${state.rollover||0}</div></div>
+    <div class="comp-summary-pill"><div class="comp-summary-label">Still Standing</div><div class="comp-summary-value">${standing.length}</div></div>
+    <div class="comp-summary-pill"><div class="comp-summary-label">Eliminated</div><div class="comp-summary-value">${eliminated.length}</div></div>
+   </div>
+ </div>
+ <div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${standing.length}</span></div><div class="card-body list">${standing.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div>
+ <div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${eliminated.length}</span></div><div class="card-body list">${eliminated.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`;
+}
 function playerHall(){const r=defendingChampion(),champ=state.players.find(p=>p.name===r);return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">🏆 ${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${state.champions.length?state.champions.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">🏆 ${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`}
 function rules(){return `<div class="card"><div class="card-head"><strong>Competition Info</strong></div><div class="card-body list"><div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div><div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div></div></div><div class="card"><div class="card-head"><strong>Rules</strong></div><div class="card-body"><p style="line-height:1.55;margin:0">${state.rules}</p></div></div>`}
 function playerSettings(){
@@ -941,7 +1017,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=23");
+ const registration=await navigator.serviceWorker.register("sw.js?v=24");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1732,7 +1808,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=23").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=24").catch(console.error));
 }
 
 boot();
