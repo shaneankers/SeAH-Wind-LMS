@@ -1573,30 +1573,7 @@ async function approveAndPay(i){
   toast("Could not approve player: "+(e.message||"unknown error"));
  }
 }
-async function rejectPlayer(i){
- const p=state.players[i];
- if(!p)return toast("Player not found.");
- if(p.adminPlayer||p.id===(authUser&&authUser.user_id))return toast("You cannot remove the admin account.");
- if(!confirm("Remove "+p.name+"?
-
-This will delete the player account, payment status, picks and history."))return;
- try{
-  if(onlineReady&&p.id){
-   await supabaseClient.from("push_subscriptions").delete().eq("user_id",p.id);
-   await supabaseClient.from("pick_history").delete().eq("user_id",p.id);
-   await supabaseClient.from("player_state").delete().eq("user_id",p.id);
-   const {error}=await supabaseClient.from("app_users").delete().eq("id",p.id);
-   if(error)throw error;
-  }
-  state.players.splice(i,1);
-  addActivity("player",p.name+" removed","Player account deleted");
-  toast(p.name+" removed.");
-  save();
- }catch(e){
-  console.error(e);
-  toast("Could not remove player: "+(e.message||"unknown error"));
- }
-}
+function rejectPlayer(i){if(confirm("Remove this player?")){state.players.splice(i,1);save()}}
 function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
@@ -1605,16 +1582,7 @@ function togglePaid(i){
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
  save();
 }
-function unlockPick(i){
- const p=state.players[i];
- if(!p)return toast("Player not found.");
- p.locked=false;
- p.pick="";
- p.result="pending";
- window.tempPick="";
- toast(p.name+"'s pick unlocked and cleared.");
- save();
-}
+function unlockPick(i){state.players[i].locked=false;toast(state.players[i].name+"'s pick unlocked.");save()}
 function renamePlayer(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
@@ -1697,17 +1665,7 @@ function confirmPlayerPick(){
  toast("Pick submitted and locked.");
  save();
 }
-async function saveChampionToSupabase(player){
- if(!onlineReady||!player||!player.id)return;
- const {error}=await supabaseClient.from("champions").insert({
-  user_id:player.id,
-  competition_number:state.competition,
-  rollover_number:state.rollover||0
- });
- if(error)throw error;
-}
-
-async function processRound(){
+function processRound(){
  const pending=alive().filter(p=>p.result==="pending");
  if(pending.length){
   toast("Mark result for: "+pending.map(p=>p.name).join(", "));
@@ -1752,12 +1710,6 @@ async function processRound(){
  if(s.length===1){
   s[0].wins++;
   state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
-  try{
-   await saveChampionToSupabase(s[0]);
-  }catch(e){
-   console.error(e);
-   toast("Winner saved locally, but Hall of Fame did not save to Supabase: "+(e.message||"unknown error"));
-  }
   addActivity("round","Winner found: "+s[0].name,"Competition #"+state.competition);
   addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
   alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
