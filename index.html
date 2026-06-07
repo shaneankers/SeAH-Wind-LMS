@@ -408,6 +408,84 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 @media(max-width:1050px){.dashboard-hero,.dashboard-grid,.player-pick-hero{grid-template-columns:1fr}.hero-block{border-right:0;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:14px}.hero-block:last-child{border-bottom:0}.metric-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.metric-grid,.admin-action-cards{grid-template-columns:1fr}.dashboard-hero{padding:16px}.hero-value{font-size:25px}}
 
+
+/* ===== v20 Dashboard Cleanup ===== */
+.mode-switch button::before,
+.nav button::before{
+  margin-right:8px;
+  color:inherit;
+}
+.mode-switch button:first-child::before{content:"♢";}
+.mode-switch button:nth-child(2)::before{content:"○";}
+.nav button{font-size:15px}
+.dashboard-hero.v20{
+  grid-template-columns:1.15fr 1fr 1fr;
+}
+.icon-line{
+  width:46px;height:46px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid #ff6a2a;
+  color:#f4511e;
+  font-size:23px;
+  font-weight:1000;
+  background:#fff7ed;
+  flex:0 0 auto;
+}
+.hero-line-icon{
+  width:70px;height:70px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid rgba(255,255,255,.7);
+  color:white;
+  font-size:32px;
+  font-weight:1000;
+  background:rgba(255,255,255,.07);
+}
+.clean-action-card .action-icon{
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#f4511e;
+  font-size:22px;
+}
+.clean-action-card .action-title{
+  color:#071426;
+}
+.dashboard-grid.clean{
+  grid-template-columns:1.05fr .95fr;
+}
+.panel-card.compact-panel{
+  min-height:unset;
+}
+.rich-avatar.orange-icon{
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#f4511e;
+  font-weight:1000;
+}
+.metric-card .metric-icon{
+  background:#fff7ed!important;
+  border:1px solid #fed7aa;
+  color:#f4511e!important;
+}
+.metric-card.green .metric-icon{
+  background:#ecfdf5!important;
+  border-color:#bbf7d0;
+  color:#16a34a!important;
+}
+.metric-card.red .metric-icon{
+  background:#fef2f2!important;
+  border-color:#fecaca;
+  color:#dc2626!important;
+}
+.dashboard-secondary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  margin-top:18px;
+}
+@media(max-width:1050px){
+ .dashboard-hero.v20,.dashboard-grid.clean,.dashboard-secondary-grid{grid-template-columns:1fr}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -448,7 +526,7 @@ let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
 const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v19";
+const storeKey="seah_wind_lms_live_supabase_v20";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -574,41 +652,73 @@ function dashboard(){
  const approved=state.players.filter(p=>p.approved);
  const paidPlayers=paid();
  const alivePlayers=alive();
- const pickPct=alivePlayers.length?Math.round(((alivePlayers.length-missing.length)/alivePlayers.length)*100):0;
+ const submitted=Math.max(0,alivePlayers.length-missing.length);
+ const pickPct=alivePlayers.length?Math.round((submitted/alivePlayers.length)*100):0;
  const paidPct=approved.length?Math.round((paidPlayers.length/approved.length)*100):0;
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
- <div class="dashboard-hero">
-  <div class="hero-block"><div class="hero-icon">🏆</div><div><div class="hero-kicker">Current Round</div><div class="hero-value">Round ${state.round}</div><div class="hero-detail">Deadline: ${state.deadline}</div></div></div>
-  <div class="hero-block"><div><div class="hero-kicker">Competition Pot</div><div class="hero-value orange">£${pot()}</div><div class="hero-detail">${paidPlayers.length} paid players</div></div></div>
-  <div class="hero-block"><div><div class="hero-kicker">Rollover</div><div class="hero-value orange">£${state.potCarryover||0}</div><div class="hero-detail">Competition #${state.competition}</div></div></div>
- </div>
- <div class="metric-grid">
-  <div class="metric-card"><div class="metric-icon">👥</div><div><div class="metric-value">${approved.length}</div><div class="metric-label">Total Players</div></div></div>
-  <div class="metric-card green"><div class="metric-icon">✓</div><div><div class="metric-value">${alivePlayers.length}</div><div class="metric-label">Active Players</div></div></div>
-  <div class="metric-card orange"><div class="metric-icon">£</div><div><div class="metric-value">${paidPlayers.length}</div><div class="metric-label">Paid Players</div></div></div>
-  <div class="metric-card red"><div class="metric-icon">⏰</div><div><div class="metric-value">${missing.length}</div><div class="metric-label">Yet to Pick</div></div></div>
- </div>
- <div class="dashboard-grid">
-  <div class="panel-card"><div class="panel-title"><span>📅 Round Status</span><span class="badge orange">Round ${state.round}</span></div>
-   <div class="progress-row"><div class="progress-top"><span>Picks Submitted</span><span>${alivePlayers.length-missing.length} / ${alivePlayers.length}</span></div><div class="progress-track"><div class="progress-fill" style="width:${pickPct}%"></div></div></div>
-   <div class="progress-row"><div class="progress-top"><span>Paid Players</span><span>${paidPlayers.length} / ${approved.length}</span></div><div class="progress-track"><div class="progress-fill" style="width:${paidPct}%"></div></div></div>
-   <div class="rich-row"><div><div class="rich-name">Time Remaining</div><div class="rich-sub">Until picks deadline</div></div><span class="badge orange">${state.deadline}</span></div>
+ <div class="dashboard-hero v20">
+  <div class="hero-block">
+   <div class="hero-line-icon">⌾</div>
+   <div><div class="hero-kicker">Current Round</div><div class="hero-value">Round ${state.round}</div><div class="hero-detail">Deadline: ${state.deadline}</div></div>
   </div>
-  <div class="panel-card"><div class="panel-title"><span>⚡ Admin Actions</span></div><div class="admin-action-cards">
-    <div class="action-card" onclick="notifyUnpaid()"><div class="action-icon">✉️</div><div><div class="action-title">Unpaid Players</div><div class="action-sub">Notify</div></div></div>
-    <div class="action-card" onclick="notifyMissingPicks()"><div class="action-icon">🔔</div><div><div class="action-title">Missing Picks</div><div class="action-sub">Notify</div></div></div>
-    <div class="action-card" onclick="notifyWinner()"><div class="action-icon">🏆</div><div><div class="action-title">Announce Winner</div><div class="action-sub">Notify</div></div></div>
-    <div class="action-card" onclick="notifyRollover()"><div class="action-icon">💷</div><div><div class="action-title">Announce Rollover</div><div class="action-sub">Notify</div></div></div>
-  </div></div>
-  <div class="panel-card"><div class="panel-title"><span>🕘 Recent Activity</span></div><div class="rich-list">
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar">✅</div><div><div class="rich-name">Competition active</div><div class="rich-sub">Round ${state.round}</div></div></div><span class="rich-sub">Now</span></div>
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar">👥</div><div><div class="rich-name">${approved.length} approved players</div><div class="rich-sub">${pending.length} pending approval</div></div></div></div>
-    <div class="rich-row"><div class="rich-left"><div class="rich-avatar">💷</div><div><div class="rich-name">Prize pot £${pot()}</div><div class="rich-sub">${paidPlayers.length} paid entries</div></div></div></div>
-  </div></div>
-  <div class="panel-card"><div class="panel-title"><span>❗ Missing Picks</span><span class="badge red">${missing.length} players</span></div><div class="rich-list">
-    ${missing.length?missing.slice(0,5).map(p=>`<div class="rich-row"><div class="rich-left"><div class="rich-avatar">👤</div><div><div class="rich-name">${p.name}</div><div class="rich-sub">Round ${state.round}</div></div></div><span class="badge red">Missing</span></div>`).join(""):`<div class="notice">Everyone has picked.</div>`}
-  </div>${missing.length?`<span class="link-orange" onclick="setPage('round')">View all missing picks ›</span>`:""}</div>
+  <div class="hero-block">
+   <div><div class="hero-kicker">Prize Pot</div><div class="hero-value orange">£${pot()}</div><div class="hero-detail">${paidPlayers.length} paid entries</div></div>
+  </div>
+  <div class="hero-block">
+   <div><div class="hero-kicker">Pick Status</div><div class="hero-value">${submitted}/${alivePlayers.length}</div><div class="hero-detail">${missing.length} still to pick</div></div>
+  </div>
+ </div>
+
+ <div class="metric-grid">
+  <div class="metric-card"><div class="metric-icon">♙</div><div><div class="metric-value">${approved.length}</div><div class="metric-label">Players</div></div></div>
+  <div class="metric-card green"><div class="metric-icon">✓</div><div><div class="metric-value">${alivePlayers.length}</div><div class="metric-label">Still Standing</div></div></div>
+  <div class="metric-card orange"><div class="metric-icon">£</div><div><div class="metric-value">${paidPlayers.length}</div><div class="metric-label">Paid</div></div></div>
+  <div class="metric-card red"><div class="metric-icon">!</div><div><div class="metric-value">${missing.length}</div><div class="metric-label">Missing Picks</div></div></div>
+ </div>
+
+ <div class="dashboard-grid clean">
+  <div class="panel-card compact-panel">
+   <div class="panel-title"><span><span class="icon-line" style="display:inline-flex;width:34px;height:34px;font-size:16px;margin-right:8px">R</span>Round Progress</span><span class="badge orange">Round ${state.round}</span></div>
+   <div class="progress-row">
+    <div class="progress-top"><span>Picks Submitted</span><span>${submitted} / ${alivePlayers.length}</span></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pickPct}%"></div></div>
+   </div>
+   <div class="progress-row">
+    <div class="progress-top"><span>Paid Players</span><span>${paidPlayers.length} / ${approved.length}</span></div>
+    <div class="progress-track"><div class="progress-fill" style="width:${paidPct}%"></div></div>
+   </div>
+   <div class="rich-row"><div><div class="rich-name">Deadline</div><div class="rich-sub">Pick cut-off time</div></div><span class="badge orange">${state.deadline}</span></div>
+  </div>
+
+  <div class="panel-card compact-panel">
+   <div class="panel-title"><span><span class="icon-line" style="display:inline-flex;width:34px;height:34px;font-size:16px;margin-right:8px">A</span>Admin Actions</span></div>
+   <div class="admin-action-cards">
+    <div class="action-card clean-action-card" onclick="notifyUnpaid()"><div class="action-icon">✉</div><div><div class="action-title">Unpaid Players</div><div class="action-sub">Send payment reminder</div></div></div>
+    <div class="action-card clean-action-card" onclick="notifyMissingPicks()"><div class="action-icon">⌁</div><div><div class="action-title">Missing Picks</div><div class="action-sub">Send pick reminder</div></div></div>
+    <div class="action-card clean-action-card" onclick="notifyWinner()"><div class="action-icon">♕</div><div><div class="action-title">Winner</div><div class="action-sub">Send announcement</div></div></div>
+    <div class="action-card clean-action-card" onclick="notifyRollover()"><div class="action-icon">↻</div><div><div class="action-title">Rollover</div><div class="action-sub">Send announcement</div></div></div>
+   </div>
+  </div>
+ </div>
+
+ <div class="dashboard-secondary-grid">
+  <div class="panel-card">
+   <div class="panel-title"><span>Status Summary</span></div>
+   <div class="rich-list">
+    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">✓</div><div><div class="rich-name">Competition active</div><div class="rich-sub">Competition #${state.competition} · Round ${state.round}</div></div></div></div>
+    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">P</div><div><div class="rich-name">${pending.length} pending approval</div><div class="rich-sub">${approved.length} approved players</div></div></div></div>
+    <div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">£</div><div><div class="rich-name">Prize pot £${pot()}</div><div class="rich-sub">${paidPlayers.length} paid entries</div></div></div></div>
+   </div>
+  </div>
+
+  <div class="panel-card">
+   <div class="panel-title"><span>Missing Picks</span><span class="badge red">${missing.length}</span></div>
+   <div class="rich-list">
+    ${missing.length?missing.slice(0,5).map(p=>`<div class="rich-row"><div class="rich-left"><div class="rich-avatar orange-icon">○</div><div><div class="rich-name">${p.name}</div><div class="rich-sub">Round ${state.round}</div></div></div><span class="badge red">Missing</span></div>`).join(""):`<div class="notice">Everyone has picked.</div>`}
+   </div>
+   ${missing.length?`<span class="link-orange" onclick="setPage('round')">View round picks ›</span>`:""}
+  </div>
  </div>`;
 }
 function players(){
@@ -730,7 +840,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=19");
+ const registration=await navigator.serviceWorker.register("sw.js?v=20");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1512,7 +1622,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=19").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=20").catch(console.error));
 }
 
 boot();
