@@ -547,20 +547,39 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 }
 
 .action-targets{
-  margin-top:7px;
-  font-size:11px;
+  margin-top:8px;
+  font-size:12px;
   line-height:1.35;
-  color:#cbd5e1;
+  color:#64748b;
   font-weight:800;
 }
 .action-targets strong{
-  color:white!important;
-  font-size:11px!important;
+  color:var(--ink)!important;
+  font-size:12px!important;
   display:inline!important;
 }
 .action-targets span{
-  color:#cbd5e1!important;
-  font-size:11px!important;
+  color:#64748b!important;
+  font-size:12px!important;
+}
+.action-target-list{
+  margin-top:10px;
+  padding:0 6px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px 16px;
+}
+.action-target-block{
+  font-size:12px;
+  line-height:1.35;
+  color:#64748b;
+}
+.action-target-block strong{
+  color:var(--ink);
+  font-size:12px;
+}
+@media(max-width:560px){
+ .action-target-list{grid-template-columns:1fr}
 }
 .news-card{
   max-width:760px;
@@ -992,9 +1011,11 @@ function toggleActivityList(){
 }
 
 function playerListNames(list){
- const names=list.map(p=>p.name).filter(Boolean);
+ const names=list.map(p=>p.name).filter(Boolean).sort((a,b)=>a.localeCompare(b));
  if(!names.length)return "None";
- return names.slice(0,8).join(", ")+(names.length>8?" +"+(names.length-8)+" more":"");
+ const shown=names.slice(0,4);
+ const more=names.length-shown.length;
+ return shown.join(", ")+(more>0?", and "+more+" more":"");
 }
 function announcementTargets(type){
  if(type==="unpaid")return state.players.filter(p=>p.approved&&!p.paid&&p.notifications!==false);
@@ -1002,10 +1023,23 @@ function announcementTargets(type){
  if(type==="winner"||type==="rollover")return state.players.filter(p=>p.approved&&p.notifications!==false);
  return [];
 }
-function targetSummary(type){
+function targetCount(type){
  const targets=announcementTargets(type);
- const label=(type==="winner"||type==="rollover")?"All players":"Players";
- return `<div class="action-targets"><strong>${targets.length}</strong> ${label}<br><span>${playerListNames(targets)}</span></div>`;
+ if(type==="winner"||type==="rollover")return `<div class="action-targets"><strong>${targets.length}</strong> All players</div>`;
+ return `<div class="action-targets"><strong>${targets.length}</strong> Players</div>`;
+}
+function targetDetailBlock(type,title){
+ const targets=announcementTargets(type);
+ if(type==="winner"||type==="rollover")return `<div class="action-target-block"><strong>${title}</strong><br>Players - All</div>`;
+ return `<div class="action-target-block"><strong>${title}</strong><br>${playerListNames(targets)}</div>`;
+}
+function dashboardTargetList(){
+ return `<div class="action-target-list">
+  ${targetDetailBlock('unpaid','Unpaid Players')}
+  ${targetDetailBlock('missing','Missing Picks')}
+  ${targetDetailBlock('winner','Winner')}
+  ${targetDetailBlock('rollover','Rollover')}
+ </div>`;
 }
 function renderActivityRows(limit){
  ensureActivityLog();
@@ -1057,12 +1091,12 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('bell')}</span>Admin Actions</div></div>
    <div class="action-grid">
-    <div class="action-pro" onclick="notifyUnpaid()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Unpaid Players</strong><span>Send payment reminder</span>${targetSummary('unpaid')}</div></div>
-    <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span>${targetSummary('missing')}</div></div>
-    <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span>${targetSummary('winner')}</div></div>
-    <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span>${targetSummary('rollover')}</div></div>
-    <div class="action-pro" onclick="startNextCompetition()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Start New Competition</strong><span>Reset approved players for Competition #${state.competition+1}</span></div></div>
+    <div class="action-pro" onclick="notifyUnpaid()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Unpaid Players</strong><span>Send payment reminder</span>${targetCount('unpaid')}</div></div>
+    <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span>${targetCount('missing')}</div></div>
+    <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span>${targetCount('winner')}</div></div>
+    <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span>${targetCount('rollover')}</div></div>
    </div>
+   ${dashboardTargetList()}
   </div>
  </div>`;
 }
@@ -1113,7 +1147,7 @@ function round(){
      </div>`}).join("")||`<div class="notice">No alive players.</div>`}
    </div>
  </div>
- <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button></div>`;
+ <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="secondary" onclick="startNextCompetition()">Start New Competition</button></div>`;
 }
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
@@ -1597,7 +1631,7 @@ function processRound(){
 }
 function nextRoundOnly(){state.round++;save()}
 function startNextCompetition(){
- if(!confirm("Start Competition #"+(state.competition+1)+"?\n\nThis will reset all approved players to Alive, clear picks and previous teams, and mark everyone as unpaid for the new competition."))return;
+ if(!confirm("Start Competition #"+(state.competition+1)+"?\n\nThis will reset approved players for Round 1 of the next competition, clear picks and previous teams, and mark everyone as unpaid so you can collect money before the new competition starts."))return;
  state.competition++;
  state.rollover=0;
  state.potCarryover=0;
@@ -1613,8 +1647,8 @@ function startNextCompetition(){
   p.outPick=null;
  });
  addActivity("round","Competition #"+state.competition+" started","All approved players reset and payment is due");
- page="dashboard";
- toast("Competition #"+state.competition+" started.");
+ page="round";
+ toast("Competition #"+state.competition+" started. Collect payments before Round 1.");
  save();
 }
 function saveSettings(){state.entryFee=Number(document.getElementById("entryFee").value||5);state.deadline=document.getElementById("deadline").value.trim();state.rules=document.getElementById("rulesText").value.trim();save()}
