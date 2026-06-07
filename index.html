@@ -546,6 +546,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   display:inline-flex;
 }
 
+.action-targets{
+  margin-top:7px;
+  font-size:11px;
+  line-height:1.35;
+  color:#cbd5e1;
+  font-weight:800;
+}
+.action-targets strong{
+  color:white!important;
+  font-size:11px!important;
+  display:inline!important;
+}
+.action-targets span{
+  color:#cbd5e1!important;
+  font-size:11px!important;
+}
+.news-card{
+  max-width:760px;
+}
+
 
 /* ===== v24 Stat Cards + Competition Header Polish ===== */
 .stat-pro{
@@ -901,7 +921,7 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
  ensureActivityLog();
@@ -910,7 +930,7 @@ function render(){
   if(p.locked && !p.pick) p.locked=false;
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
- if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
+ if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,latestNews,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
 function setPage(p){
  page=p;
  render();
@@ -971,15 +991,36 @@ function toggleActivityList(){
  render();
 }
 
+function playerListNames(list){
+ const names=list.map(p=>p.name).filter(Boolean);
+ if(!names.length)return "None";
+ return names.slice(0,8).join(", ")+(names.length>8?" +"+(names.length-8)+" more":"");
+}
+function announcementTargets(type){
+ if(type==="unpaid")return state.players.filter(p=>p.approved&&!p.paid&&p.notifications!==false);
+ if(type==="missing")return alive().filter(p=>!p.pick&&p.notifications!==false);
+ if(type==="winner"||type==="rollover")return state.players.filter(p=>p.approved&&p.notifications!==false);
+ return [];
+}
+function targetSummary(type){
+ const targets=announcementTargets(type);
+ const label=(type==="winner"||type==="rollover")?"All players":"Players";
+ return `<div class="action-targets"><strong>${targets.length}</strong> ${label}<br><span>${playerListNames(targets)}</span></div>`;
+}
+function renderActivityRows(limit){
+ ensureActivityLog();
+ const visible=(state.activityLog||[]).slice(0,limit);
+ return visible.length?visible.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${a.title}</div><div class="activity-sub">${a.detail||""}</div></div></div><div class="activity-time">${activityTimeLabel(a.time)}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`;
+}
+
 function dashboard(){
  const pending=state.players.filter(p=>!p.approved);
- const unpaid=state.players.filter(p=>p.approved&&!p.paid);
- const missing=alive().filter(p=>!p.pick);
+ const unpaid=announcementTargets("unpaid");
+ const missing=announcementTargets("missing");
  const approved=state.players.filter(p=>p.approved);
  const paidPlayers=paid();
  const alivePlayers=alive();
  ensureActivityLog();
- const visibleActivities=(state.activityLog||[]).slice(0,window.showAllActivity?50:4);
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
  <div class="admin-hero">
@@ -1008,7 +1049,7 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('check')}</span>Recent Activity</div><span class="badge orange">${state.activityLog.length}</span></div>
    <div class="activity-list">
-    ${visibleActivities.length?visibleActivities.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${a.title}</div><div class="activity-sub">${a.detail||""}</div></div></div><div class="activity-time">${activityTimeLabel(a.time)}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`}
+    ${renderActivityRows(window.showAllActivity?50:4)}
    </div>
    ${(state.activityLog||[]).length>4?`<span class="activity-toggle" onclick="toggleActivityList()">${window.showAllActivity?'Show less':'View full activity list'} ›</span>`:""}
   </div>
@@ -1016,10 +1057,11 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('bell')}</span>Admin Actions</div></div>
    <div class="action-grid">
-    <div class="action-pro" onclick="notifyUnpaid()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Unpaid Players</strong><span>Send payment reminder</span></div></div>
-    <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span></div></div>
-    <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span></div></div>
-    <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span></div></div>
+    <div class="action-pro" onclick="notifyUnpaid()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Unpaid Players</strong><span>Send payment reminder</span>${targetSummary('unpaid')}</div></div>
+    <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span>${targetSummary('missing')}</div></div>
+    <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span>${targetSummary('winner')}</div></div>
+    <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span>${targetSummary('rollover')}</div></div>
+    <div class="action-pro" onclick="startNextCompetition()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Start New Competition</strong><span>Reset approved players for Competition #${state.competition+1}</span></div></div>
    </div>
   </div>
  </div>`;
@@ -1031,7 +1073,6 @@ function players(){
    <div class="card-body list">
      ${pending.length?pending.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row">
        <div class="player-list-name">${p.name}</div>
-       <span class="badge yellow">Pending</span>
        <button class="small green" onclick="approvePlayer(${i})">Approve</button>
        <button class="small yellow" onclick="approveAndPay(${i})">Approve + Paid</button>
        <button class="small red" onclick="rejectPlayer(${i})">Reject</button>
@@ -1106,6 +1147,17 @@ function myPick(){
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
  </div></div>`;
+}
+function latestNews(){
+ ensureActivityLog();
+ return `<div class="card news-card">
+  <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
+  <div class="card-body">
+   <div class="activity-list">
+    ${renderActivityRows(30)}
+   </div>
+  </div>
+ </div>`;
 }
 function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${t}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
 function competition(){
@@ -1544,7 +1596,27 @@ function processRound(){
  save();
 }
 function nextRoundOnly(){state.round++;save()}
-function startNextCompetition(){state.competition++;state.rollover=0;state.potCarryover=0;state.round=1;state.players.filter(p=>p.approved&&p.paid).forEach(p=>{p.alive=true;p.pick="";p.locked=false;p.result="pending";p.previous=[];p.outRound=null;p.outPick=null});page="dashboard";toast("Competition #"+state.competition+" started.");save()}
+function startNextCompetition(){
+ if(!confirm("Start Competition #"+(state.competition+1)+"?\n\nThis will reset all approved players to Alive, clear picks and previous teams, and mark everyone as unpaid for the new competition."))return;
+ state.competition++;
+ state.rollover=0;
+ state.potCarryover=0;
+ state.round=1;
+ state.players.filter(p=>p.approved).forEach(p=>{
+  p.alive=true;
+  p.paid=false;
+  p.pick="";
+  p.locked=false;
+  p.result="pending";
+  p.previous=[];
+  p.outRound=null;
+  p.outPick=null;
+ });
+ addActivity("round","Competition #"+state.competition+" started","All approved players reset and payment is due");
+ page="dashboard";
+ toast("Competition #"+state.competition+" started.");
+ save();
+}
 function saveSettings(){state.entryFee=Number(document.getElementById("entryFee").value||5);state.deadline=document.getElementById("deadline").value.trim();state.rules=document.getElementById("rulesText").value.trim();save()}
 function saveTeams(){state.teams=document.getElementById("teamsText").value.split("\n").map(x=>x.trim()).filter(Boolean);save()}
 function saveAdminAccount(){state.adminUsername=document.getElementById("adminUsername").value.trim();state.adminPassword=document.getElementById("adminPassword").value.trim();authUser.name=state.adminUsername;localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));save()}
