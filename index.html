@@ -719,6 +719,35 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   }
 }
 
+/* v31 launch polish */
+.recipient-line{
+  margin-top:8px!important;
+  color:#ff5a1f!important;
+  font-size:14px!important;
+  font-weight:400!important;
+  line-height:1.25!important;
+}
+.recipient-line strong{
+  font-weight:900!important;
+}
+.factory-reset-card .card-body{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:10px!important;
+}
+.factory-reset-button{
+  width:auto!important;
+  max-width:100%!important;
+}
+.factory-reset-desc{
+  margin-top:2px!important;
+  color:#64748b!important;
+  font-size:13px!important;
+  line-height:1.45!important;
+  max-width:760px!important;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1018,8 +1047,8 @@ function announcementTargets(type){
 }
 function recipientLine(type){
  const targets=announcementTargets(type);
- if(type==="winner"||type==="rollover")return `<div class="recipient-line">Recipients: All players</div>`;
- return `<div class="recipient-line">Recipients: ${targets.length} ${targets.length===1?"player":"players"}</div>`;
+ if(type==="winner"||type==="rollover")return `<div class="recipient-line">Recipients: <strong>All</strong> players</div>`;
+ return `<div class="recipient-line">Recipients: <strong>${targets.length}</strong> ${targets.length===1?"player":"players"}</div>`;
 }
 function renderActivityRows(limit){
  ensureActivityLog();
