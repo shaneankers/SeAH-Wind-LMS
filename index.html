@@ -352,8 +352,9 @@ const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHA
 let onlineReady=false;
 let currentUserId=null;
 const VAPID_PUBLIC_KEY="BHNXljGtlxYA-PCZSOI0fv8CO7P4F-ZHPqdB5Yusb2uymmJFpvcH9plO8voj9xWP1XQO45Q9U9TTVonok_gJR80";
+const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
-const storeKey="seah_wind_lms_live_supabase_v15";
+const storeKey="seah_wind_lms_live_supabase_v17";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
@@ -577,7 +578,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=16");
+ const registration=await navigator.serviceWorker.register("sw.js?v=17");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -995,10 +996,79 @@ function manualCopy(){
   toast("Select the invite text and copy it manually.");
  }
 }
-function notifyUnpaid(){navigator.clipboard&&navigator.clipboard.writeText(noteText("unpaid"));toast("Payment reminder copied/sent.")}
-function notifyMissingPicks(){navigator.clipboard&&navigator.clipboard.writeText(noteText("missingPick"));toast("Pick reminder copied/sent.")}
-function notifyWinner(){navigator.clipboard&&navigator.clipboard.writeText(noteText("winner"));toast("Winner announcement copied/sent.")}
-function notifyRollover(){navigator.clipboard&&navigator.clipboard.writeText(noteText("rollover"));toast("Rollover announcement copied/sent.")}
+async function sendPushToUsername(username,title,message){
+ const res=await fetch(PUSH_FUNCTION_URL,{
+  method:"POST",
+  headers:{
+   "Content-Type":"application/json",
+   "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
+  },
+  body:JSON.stringify({username,title,message})
+ });
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok||data.success===false)throw new Error(data.error||"Push send failed");
+ return data;
+}
+
+async function sendPushToPlayers(players,title,message){
+ const targets=[...new Set(players.map(p=>p.username||p.name).filter(Boolean))];
+ if(!targets.length)return {sent:0,failed:0,total:0};
+ let sent=0,failed=0,total=0;
+ for(const username of targets){
+  try{
+   const r=await sendPushToUsername(username,title,message);
+   sent+=(r.sent||0);
+   failed+=(r.failed||0);
+   total+=(r.total||0);
+  }catch(e){
+   console.error("Push failed for",username,e);
+   failed++;
+  }
+ }
+ return {sent,failed,total};
+}
+
+async function notifyUnpaid(){
+ const targets=state.players.filter(p=>p.approved&&!p.paid&&p.notifications!==false);
+ if(!targets.length)return toast("No unpaid players to notify.");
+ try{
+  const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("unpaid"));
+  toast("Payment reminder sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
+ }catch(e){
+  toast("Payment reminder failed: "+(e.message||"unknown error"));
+ }
+}
+
+async function notifyMissingPicks(){
+ const targets=alive().filter(p=>!p.pick&&p.notifications!==false);
+ if(!targets.length)return toast("No missing picks to notify.");
+ try{
+  const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("missingPick"));
+  toast("Pick reminder sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
+ }catch(e){
+  toast("Pick reminder failed: "+(e.message||"unknown error"));
+ }
+}
+
+async function notifyWinner(){
+ try{
+  const targets=state.players.filter(p=>p.approved&&p.notifications!==false);
+  const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("winner"));
+  toast("Winner announcement sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
+ }catch(e){
+  toast("Winner announcement failed: "+(e.message||"unknown error"));
+ }
+}
+
+async function notifyRollover(){
+ try{
+  const targets=state.players.filter(p=>p.approved&&p.notifications!==false);
+  const r=await sendPushToPlayers(targets,"SêAH Wind LMS",noteText("rollover"));
+  toast("Rollover announcement sent. Devices: "+r.sent+(r.failed?"; failed: "+r.failed:""));
+ }catch(e){
+  toast("Rollover announcement failed: "+(e.message||"unknown error"));
+ }
+}
 
 
 function setOnlineStatus(text,ok){
@@ -1290,7 +1360,7 @@ async function boot(){
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=16").catch(console.error));
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=17").catch(console.error));
 }
 
 boot();
