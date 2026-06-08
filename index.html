@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
+<!-- v41 join code RPC fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1952,17 +1953,29 @@ async function changeJoinCode(){
 
 async function saveJoinCodeToDatabase(newCode){
  if(!onlineReady)throw new Error("Database is not connected.");
- const {data,error}=await supabaseClient
-  .from("app_settings")
-  .update({join_code:newCode})
-  .eq("id",1)
-  .select("id,join_code")
-  .maybeSingle();
- if(error)throw error;
- if(!data||data.join_code!==newCode){
-  throw new Error("Database did not accept the join code update. Check app_settings update policy.");
+
+ // Primary path: use Supabase RPC so RLS on app_settings cannot silently block the update.
+ const rpcRes=await supabaseClient.rpc("update_join_code",{p_join_code:newCode});
+ if(rpcRes.error){
+  // Fallback for older databases where the RPC has not been created yet.
+  const directRes=await supabaseClient
+   .from("app_settings")
+   .update({join_code:newCode})
+   .eq("id",1)
+   .select("id,join_code")
+   .maybeSingle();
+  if(directRes.error)throw directRes.error;
+  if(!directRes.data||directRes.data.join_code!==newCode){
+   throw new Error("Join code was not saved. Create the update_join_code SQL function or check app_settings update policy.");
+  }
+  return directRes.data;
  }
- return data;
+
+ const row=Array.isArray(rpcRes.data)?rpcRes.data[0]:rpcRes.data;
+ if(!row||row.join_code!==newCode){
+  throw new Error("Join code RPC ran but did not return the new code.");
+ }
+ return row;
 }
 function copyInvite(){
  const msg="Join SeAH Wind LMS\\nCreate your account using join code: "+state.joinCode;
