@@ -1483,7 +1483,7 @@ function addAppGuide(){
  if(el)el.style.display=el.style.display==="none"?"block":"none";
 }
 
-function settings(){ensureLeagues();const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${adminUsername}"><label style="margin-top:12px">New Password</label><input id="adminPassword" type="password" value="" placeholder="Leave blank to keep current password"><br><br><button onclick="saveAdminAccount()">Save Admin Login</button><div class="muted" style="margin-top:10px">Admin login is saved to Supabase. Leave password blank unless you want to change it.</div></div></div>
+function settings(){ensureLeagues();const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${adminUsername}"><label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value=""><br><br><button onclick="saveAdminAccount()">Save Admin Login</button></div></div>
 
 <div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body"><div class="item"><div><div class="item-title">${state.joinCode}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div><br><button onclick="copyInvite()">Copy Invite Message</button></div></div>
 
@@ -1868,6 +1868,7 @@ async function factoryResetKeepAdmin(){
   adminPlayer.approved=true;
   adminPlayer.paid=true;
   adminPlayer.alive=true;
+  adminPlayer.wins=0;
   adminPlayer.pick="";
   adminPlayer.locked=false;
   adminPlayer.result="pending";
@@ -1883,6 +1884,9 @@ async function factoryResetKeepAdmin(){
   state.activityLog=[];
   state.adminAlerts=[];
   localStorage.setItem(storeKey,JSON.stringify(state));
+  if(onlineReady){
+   await dbUpsertPlayer(adminPlayer);
+  }
   page="dashboard";
   toast("Factory reset complete. Admin account kept.");
   if(onlineReady)await dbLoad(); else render();
