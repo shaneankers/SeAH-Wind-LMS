@@ -1909,7 +1909,29 @@ function saveNotificationMessages(){
  toast("Notification messages saved.");
  save();
 }
-function changeJoinCode(){const c=prompt("Enter new join code",state.joinCode);if(c){state.joinCode=c.trim();save()}}
+async function changeJoinCode(){
+ const c=prompt("Enter new join code",state.joinCode);
+ if(c===null)return;
+ const newCode=c.trim();
+ if(!newCode)return toast("Join code cannot be blank.");
+ const oldCode=state.joinCode;
+ state.joinCode=newCode;
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ try{
+  if(onlineReady){
+   const {error}=await supabaseClient.from("app_settings").update({join_code:newCode}).eq("id",1);
+   if(error)throw error;
+  }
+  toast("Join code updated.");
+  render();
+ }catch(e){
+  state.joinCode=oldCode;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  console.error(e);
+  toast("Could not save join code to database: "+(e.message||"unknown error"));
+  render();
+ }
+}
 function copyInvite(){
  const msg="Join SeAH Wind LMS\\nCreate your account using join code: "+state.joinCode;
  showCopyModal(msg);
@@ -2173,20 +2195,22 @@ async function dbLoad(){
 
 async function dbSaveSettings(){
  if(!onlineReady)return;
- await supabaseClient.from("app_settings").update({
+ const settingsRes=await supabaseClient.from("app_settings").update({
   join_code:state.joinCode,
   entry_fee:state.entryFee,
   deadline:state.deadline,
   rules:state.rules
  }).eq("id",1);
+ if(settingsRes.error)throw settingsRes.error;
 
  if(state.activeCompetitionId){
-  await supabaseClient.from("competitions").update({
+  const compRes=await supabaseClient.from("competitions").update({
    competition_number:state.competition,
    rollover_number:state.rollover||0,
    round_number:state.round,
    pot_carryover:state.potCarryover||0
   }).eq("id",state.activeCompetitionId);
+  if(compRes.error)throw compRes.error;
  }
 }
 
@@ -2278,7 +2302,10 @@ async function dbSyncAll(){
 const localSave=save;
 save=function(){
  localStorage.setItem(storeKey,JSON.stringify(state));
- dbSyncAll().catch(e=>console.error(e));
+ dbSyncAll().catch(e=>{
+  console.error(e);
+  toast("Database save failed: "+(e.message||"check Supabase policies"));
+ });
  render();
 };
 
