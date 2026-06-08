@@ -986,6 +986,71 @@ function renderAuth(){
  login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${loginMode==='login'?`<label>Username</label><input id="loginName" placeholder="Enter username"><label style="margin-top:12px">Password</label><input id="loginPin" type="password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" placeholder="Choose username"><label style="margin-top:12px">Password</label><input id="createPin" type="password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
+async function saveAdminAccount(){
+ const username=(document.getElementById("adminUsername")?.value||"").trim();
+ const password=(document.getElementById("adminPassword")?.value||"").trim();
+
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(!username)return toast("Enter an admin username.");
+ if(password&&password.length<4)return toast("Password must be at least 4 characters.");
+
+ const oldUsername=authUser.username||state.adminUsername||authUser.name;
+ const oldName=authUser.name||oldUsername;
+
+ try{
+  if(onlineReady&&authUser.user_id){
+   const {error:updateError}=await supabaseClient
+    .from("app_users")
+    .update({
+     username:username,
+     display_name:username,
+     must_reset_password:false
+    })
+    .eq("id",authUser.user_id);
+
+   if(updateError)throw updateError;
+
+   if(password){
+    const {error:passError}=await supabaseClient.rpc("admin_reset_password_by_username",{
+     p_username:username,
+     p_new_password:password
+    });
+    if(passError)throw passError;
+
+    await supabaseClient
+     .from("app_users")
+     .update({must_reset_password:false})
+     .eq("id",authUser.user_id);
+   }
+  }
+
+  state.adminUsername=username;
+  if(password)state.adminPassword=password;
+
+  authUser.username=username;
+  authUser.name=username;
+  authUser.must_reset_password=false;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+
+  const adminPlayer=state.players.find(p=>p.id===authUser.user_id||p.adminPlayer===true||p.username===oldUsername||p.name===oldName);
+  if(adminPlayer){
+   adminPlayer.id=authUser.user_id||adminPlayer.id;
+   adminPlayer.username=username;
+   adminPlayer.name=username;
+   adminPlayer.adminPlayer=true;
+   adminPlayer.approved=true;
+  }
+
+  if(state.selectedPlayer===oldUsername||state.selectedPlayer===oldName)state.selectedPlayer=username;
+
+  toast("Admin login updated.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Could not save admin login: "+(e.message||"unknown error"));
+ }
+}
+
 /* login functions replaced below */
 /* create account replaced below */
 function logout(){authUser=null;localStorage.removeItem("seah_auth_user_current");page="dashboard";renderAuth()}
