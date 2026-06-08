@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v54 visible dismiss button for announcements -->
+<!-- v55 announcement dismiss fixed -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -903,7 +903,17 @@ function noteText(key, extra={}){
  return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
 }
 
-function currentAnnouncementVersion(){return Number(state.announcementVersion||0)||0;}
+function announcementTextVersionFallback(){
+ const text=(state.announcement||"").trim();
+ if(!text)return 0;
+ let hash=0;
+ for(let i=0;i<text.length;i++){hash=((hash*31)+text.charCodeAt(i))>>>0;}
+ return hash||1;
+}
+function currentAnnouncementVersion(){
+ const dbVersion=Number(state.announcementVersion||0)||0;
+ return dbVersion||announcementTextVersionFallback();
+}
 function announcementDismissLocalKey(){
  const id=(authUser&&authUser.user_id)||"guest";
  return "seah_dismissed_announcements_"+id;
@@ -928,17 +938,22 @@ async function loadAnnouncementDismissalsForUser(){
  const id=authUser.user_id;
  try{
   let versions=[];
-  const rpc=await supabaseClient.rpc("get_announcement_dismissals",{p_user_id:id});
-  if(!rpc.error&&Array.isArray(rpc.data)){
-   versions=rpc.data.map(x=>Number(x.announcement_version)).filter(Boolean);
-  }else{
-   const direct=await supabaseClient
+  let direct=await supabaseClient
+   .from("player_announcement_dismissals")
+   .select("announcement_version")
+   .eq("player_id",id);
+
+  if(direct.error){
+   // Backwards compatibility only, in case an older test table used user_id.
+   direct=await supabaseClient
     .from("player_announcement_dismissals")
     .select("announcement_version")
     .eq("user_id",id);
-   if(direct.error)throw direct.error;
-   versions=(direct.data||[]).map(x=>Number(x.announcement_version)).filter(Boolean);
   }
+
+  if(direct.error)throw direct.error;
+  versions=(direct.data||[]).map(x=>Number(x.announcement_version)).filter(Boolean);
+
   if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
   state.dismissedAnnouncementVersions[id]=[...new Set(versions)];
   localStorage.setItem(announcementDismissLocalKey(),JSON.stringify(state.dismissedAnnouncementVersions[id]));
@@ -950,10 +965,12 @@ async function loadAnnouncementDismissalsForUser(){
  }
 }
 async function dismissCurrentAnnouncement(){
+ const text=(state.announcement||"").trim();
  const version=currentAnnouncementVersion();
- if(!version)return toast("No announcement to dismiss.");
+ if(!text)return toast("No announcement to dismiss.");
+ const safeVersion=version||announcementTextVersionFallback()||Date.now();
  const versions=getDismissedAnnouncementVersions();
- if(!versions.includes(version))versions.push(version);
+ if(!versions.includes(safeVersion))versions.push(safeVersion);
  const id=(authUser&&authUser.user_id)||"guest";
  if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
  state.dismissedAnnouncementVersions[id]=versions;
@@ -962,91 +979,18 @@ async function dismissCurrentAnnouncement(){
  render();
  try{
   if(authUser&&authUser.user_id&&supabaseClient){
-   const rpc=await supabaseClient.rpc("dismiss_announcement",{p_user_id:authUser.user_id,p_announcement_version:version});
-   if(rpc.error){
-    const direct=await supabaseClient.from("player_announcement_dismissals").upsert({
-     user_id:authUser.user_id,
-     announcement_version:version,
-     dismissed_at:new Date().toISOString()
-    },{onConflict:"user_id,announcement_version"});
-    if(direct.error)throw direct.error;
-   }
+   const direct=await supabaseClient.from("player_announcement_dismissals").upsert({
+    player_id:authUser.user_id,
+    announcement_version:safeVersion,
+    dismissed_at:new Date().toISOString()
+   },{onConflict:"player_id,announcement_version"});
+   if(direct.error)throw direct.error;
   }
  }catch(e){
   console.warn("Could not save announcement dismissal to Supabase",e);
   toast("Dismissed on this device, but database save failed.");
  }
 }
-
-async function syncUsersFromSupabase(){
- try{
-  if(!onlineReady)return false;
-  const {data,error}=await supabaseClient
-   .from("app_users")
-   .select("id,username,display_name,role,approved,notifications_enabled")
-   .eq("role","player")
-   .order("display_name",{ascending:true});
-  if(error)throw error;
-  if(!Array.isArray(data))return false;
-
-  let changed=false;
-
-  data.forEach(u=>{
-   let p=state.players.find(x=>x.id===u.id);
-   if(!p)p=state.players.find(x=>(x.username||"").toLowerCase()===(u.username||"").toLowerCase());
-
-   if(!p){
-    state.players.push({
-     id:u.id,
-     username:u.username,
-     name:u.display_name||u.username,
-     approved:!!u.approved,
-     paid:false,
-     alive:true,
-     wins:0,
-     pick:"",
-     locked:false,
-     result:"pending",
-     previous:[],
-     outRound:null,
-     outPick:null,
-     notifications:u.notifications_enabled!==false
-    });
-    changed=true;
-   }else{
-    const newName=u.display_name||p.name||u.username;
-    const newApproved=!!u.approved;
-    if(p.id!==u.id){p.id=u.id;changed=true;}
-    if(p.username!==u.username){p.username=u.username;changed=true;}
-    if(p.name!==newName){p.name=newName;changed=true;}
-    if(p.approved!==newApproved){p.approved=newApproved;changed=true;}
-    if(typeof p.paid==="undefined"){p.paid=false;changed=true;}
-    if(typeof p.alive==="undefined"){p.alive=true;changed=true;}
-    if(typeof p.wins==="undefined"){p.wins=0;changed=true;}
-    if(typeof p.pick==="undefined"){p.pick="";changed=true;}
-    if(typeof p.locked==="undefined"){p.locked=false;changed=true;}
-    if(typeof p.result==="undefined"){p.result="pending";changed=true;}
-    if(!Array.isArray(p.previous)){p.previous=[];changed=true;}
-    if(typeof p.notifications==="undefined"){p.notifications=u.notifications_enabled!==false;changed=true;}
-   }
-  });
-
-  if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
-  return changed;
- }catch(e){
-  console.warn("Could not sync users from Supabase",e);
-  return false;
- }
-}
-
-async function syncUsersAndRender(){
- if(window.__syncingUsers)return;
- window.__syncingUsers=true;
- const changed=await syncUsersFromSupabase();
- window.__syncingUsers=false;
- if(changed)render();
-}
-
 function renderAuth(){
  const login=document.getElementById("loginScreen"),app=document.getElementById("appScreen");
  if(authUser&&authUser.must_reset_password){
@@ -1423,7 +1367,7 @@ function round(){
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
- const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong><button class="small secondary announcement-dismiss-top" onclick="dismissCurrentAnnouncement()">Dismiss</button></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
+ const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
  return `${announcementCard}<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
@@ -1543,7 +1487,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=54-visible-announcement-dismiss");
+ const registration=await navigator.serviceWorker.register("sw.js?v=55-announcement-dismiss-fixed");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
