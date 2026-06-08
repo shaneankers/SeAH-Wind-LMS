@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v52 announcements disclaimer alphabetical teams -->
+<!-- v54 visible dismiss button for announcements -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -838,7 +838,7 @@ const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
 const storeKey="seah_wind_lms_live_supabase_v27";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
- competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
+ competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
  notifications:{
   unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",
@@ -901,6 +901,81 @@ function noteText(key, extra={}){
  }
  const data={entryFee:state.entryFee,round:state.round,deadline:state.deadline,competition:state.competition,winner:extra.winner||defendingChampion()};
  return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
+}
+
+function currentAnnouncementVersion(){return Number(state.announcementVersion||0)||0;}
+function announcementDismissLocalKey(){
+ const id=(authUser&&authUser.user_id)||"guest";
+ return "seah_dismissed_announcements_"+id;
+}
+function getDismissedAnnouncementVersions(){
+ if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
+ const id=(authUser&&authUser.user_id)||"guest";
+ if(!Array.isArray(state.dismissedAnnouncementVersions[id])){
+  try{state.dismissedAnnouncementVersions[id]=JSON.parse(localStorage.getItem(announcementDismissLocalKey())||"[]");}
+  catch(e){state.dismissedAnnouncementVersions[id]=[];}
+ }
+ return state.dismissedAnnouncementVersions[id];
+}
+function hasDismissedCurrentAnnouncement(){
+ const text=(state.announcement||"").trim();
+ const version=currentAnnouncementVersion();
+ if(!text||!version)return false;
+ return getDismissedAnnouncementVersions().includes(version);
+}
+async function loadAnnouncementDismissalsForUser(){
+ if(!authUser||!authUser.user_id||!supabaseClient)return false;
+ const id=authUser.user_id;
+ try{
+  let versions=[];
+  const rpc=await supabaseClient.rpc("get_announcement_dismissals",{p_user_id:id});
+  if(!rpc.error&&Array.isArray(rpc.data)){
+   versions=rpc.data.map(x=>Number(x.announcement_version)).filter(Boolean);
+  }else{
+   const direct=await supabaseClient
+    .from("player_announcement_dismissals")
+    .select("announcement_version")
+    .eq("user_id",id);
+   if(direct.error)throw direct.error;
+   versions=(direct.data||[]).map(x=>Number(x.announcement_version)).filter(Boolean);
+  }
+  if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
+  state.dismissedAnnouncementVersions[id]=[...new Set(versions)];
+  localStorage.setItem(announcementDismissLocalKey(),JSON.stringify(state.dismissedAnnouncementVersions[id]));
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  return true;
+ }catch(e){
+  console.warn("Could not load announcement dismissals",e);
+  return false;
+ }
+}
+async function dismissCurrentAnnouncement(){
+ const version=currentAnnouncementVersion();
+ if(!version)return toast("No announcement to dismiss.");
+ const versions=getDismissedAnnouncementVersions();
+ if(!versions.includes(version))versions.push(version);
+ const id=(authUser&&authUser.user_id)||"guest";
+ if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
+ state.dismissedAnnouncementVersions[id]=versions;
+ localStorage.setItem(announcementDismissLocalKey(),JSON.stringify(versions));
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ render();
+ try{
+  if(authUser&&authUser.user_id&&supabaseClient){
+   const rpc=await supabaseClient.rpc("dismiss_announcement",{p_user_id:authUser.user_id,p_announcement_version:version});
+   if(rpc.error){
+    const direct=await supabaseClient.from("player_announcement_dismissals").upsert({
+     user_id:authUser.user_id,
+     announcement_version:version,
+     dismissed_at:new Date().toISOString()
+    },{onConflict:"user_id,announcement_version"});
+    if(direct.error)throw direct.error;
+   }
+  }
+ }catch(e){
+  console.warn("Could not save announcement dismissal to Supabase",e);
+  toast("Dismissed on this device, but database save failed.");
+ }
 }
 
 async function syncUsersFromSupabase(){
@@ -1348,7 +1423,8 @@ function round(){
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
- return `<div class="player-top">
+ const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong><button class="small secondary announcement-dismiss-top" onclick="dismissCurrentAnnouncement()">Dismiss</button></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
+ return `${announcementCard}<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
    <h2>Round ${state.round}</h2>
@@ -1360,8 +1436,6 @@ function myPick(){
    <div class="hero-sub">${p.pick?'Submitted':'Awaiting selection'}</div>
   </div>
  </div>
-
- ${state.announcement?`<div class="card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div></div></div>`:""}
 
  <div class="player-stat-row">
   <div class="player-stat"><div class="icon-wrap navy small">${appIcon('users')}</div><div><div class="num">${state.players.filter(x=>x.approved).length}</div><div class="lbl">Players</div></div></div>
@@ -1469,7 +1543,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=52-announcements-disclaimer");
+ const registration=await navigator.serviceWorker.register("sw.js?v=54-visible-announcement-dismiss");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -2126,7 +2200,12 @@ async function saveAnnouncementAndDisclaimer(){
  const announcementEl=document.getElementById("announcementText");
  const disclaimerEl=document.getElementById("disclaimerText");
  if(!announcementEl||!disclaimerEl)return toast("Announcement form not loaded. Refresh and try again.");
- state.announcement=(announcementEl.value||"").trim();
+ const oldAnnouncement=(state.announcement||"").trim();
+ const newAnnouncement=(announcementEl.value||"").trim();
+ state.announcement=newAnnouncement;
+ if(newAnnouncement!==oldAnnouncement){
+  state.announcementVersion=(Number(state.announcementVersion||0)||0)+1;
+ }
  state.disclaimer=(disclaimerEl.value||"").trim();
  localStorage.setItem(storeKey,JSON.stringify(state));
  toast("Saving announcement and disclaimer...");
@@ -2156,6 +2235,7 @@ async function dbSaveSettings(){
   leagues:state.leagues||{},
   teams:state.teams||[],
   announcement:state.announcement||"",
+  announcement_version:Number(state.announcementVersion||0)||0,
   disclaimer:state.disclaimer||"",
   updated_at:new Date().toISOString()
  };
@@ -2183,6 +2263,7 @@ async function dbSaveSettings(){
    leagues:payload.leagues,
    teams:payload.teams,
    announcement:payload.announcement,
+   announcement_version:payload.announcement_version,
    disclaimer:payload.disclaimer,
    updated_at:payload.updated_at
   })
@@ -2420,6 +2501,7 @@ async function loadAppSettingsFromSupabase(){
   if(typeof data.rules!=="undefined"&&data.rules!==null)state.rules=data.rules;
   if(data.notifications&&typeof data.notifications==="object")state.notifications=data.notifications;
   if(typeof data.announcement!=="undefined"&&data.announcement!==null)state.announcement=data.announcement;
+  if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
   if(typeof data.disclaimer!=="undefined"&&data.disclaimer!==null)state.disclaimer=data.disclaimer;
   if(data.leagues&&typeof data.leagues==="object")state.leagues=data.leagues;
   if(Array.isArray(data.teams))state.teams=data.teams;
@@ -2442,6 +2524,7 @@ async function boot(){
  // onlineReady=true, so Settings buttons and Factory Reset silently saved only locally.
  setOnlineStatus(true,"Database connected");
  await loadAppSettingsFromSupabase();
+ await loadAnnouncementDismissalsForUser();
  render();
  await syncUsersFromSupabase();
  render();
@@ -2469,6 +2552,7 @@ if("serviceWorker" in navigator){
 window.saveSettings=saveSettings;
 window.saveAnnouncementAndDisclaimer=saveAnnouncementAndDisclaimer;
 window.saveNotificationMessages=saveNotificationMessages;
+window.dismissCurrentAnnouncement=dismissCurrentAnnouncement;
 window.factoryResetKeepAdmin=factoryResetKeepAdmin;
 
 boot();
