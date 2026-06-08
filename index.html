@@ -1573,7 +1573,28 @@ async function approveAndPay(i){
   toast("Could not approve player: "+(e.message||"unknown error"));
  }
 }
-function rejectPlayer(i){if(confirm("Remove this player?")){state.players.splice(i,1);save()}}
+async function rejectPlayer(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ if(p.adminPlayer||p.id===(authUser&&authUser.user_id))return toast("You cannot remove the admin account.");
+ if(!confirm("Remove "+p.name+"? This will delete their account, payment state and pick history."))return;
+ try{
+  if(onlineReady&&p.id){
+   await supabaseClient.from("push_subscriptions").delete().eq("user_id",p.id);
+   await supabaseClient.from("pick_history").delete().eq("user_id",p.id);
+   await supabaseClient.from("player_state").delete().eq("user_id",p.id);
+   const {error}=await supabaseClient.from("app_users").delete().eq("id",p.id);
+   if(error)throw error;
+  }
+  state.players.splice(i,1);
+  addActivity("player",p.name+" removed","Player deleted by admin");
+  toast(p.name+" removed.");
+  save();
+ }catch(e){
+  console.error(e);
+  toast("Could not remove player: "+(e.message||"unknown error"));
+ }
+}
 function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
@@ -1582,7 +1603,15 @@ function togglePaid(i){
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
  save();
 }
-function unlockPick(i){state.players[i].locked=false;toast(state.players[i].name+"'s pick unlocked.");save()}
+function unlockPick(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ p.locked=false;
+ p.pick="";
+ p.result="pending";
+ toast(p.name+"'s pick cleared and unlocked.");
+ save();
+}
 function renamePlayer(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
@@ -1709,7 +1738,7 @@ function processRound(){
 
  if(s.length===1){
   s[0].wins++;
-  state.champions.push({name:s[0].name,comp:state.competition,rollover:state.rollover||0});
+  state.champions.push({id:s[0].id,name:s[0].name,comp:state.competition,rollover:state.rollover||0});
   addActivity("round","Winner found: "+s[0].name,"Competition #"+state.competition);
   addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
   alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
@@ -2093,6 +2122,7 @@ async function dbLoad(){
   state.teams=Object.values(leagues).flat();
 
   state.champions=(champsRes.data||[]).map(c=>({
+   id:c.user_id,
    name:c.app_users?.display_name||"Winner",
    comp:c.competition_number,
    rollover:c.rollover_number
@@ -2160,9 +2190,43 @@ async function dbUpsertPlayer(p){
  });
 }
 
+async function dbSaveTeams(){
+ if(!onlineReady)return;
+ ensureLeagues();
+ const rows=[];
+ leagueKeys().forEach(league=>{
+  (state.leagues[league]||[]).forEach(team=>rows.push({league,team_name:team}));
+ });
+ await supabaseClient.from("teams").delete().neq("team_name","");
+ if(rows.length){
+  const {error}=await supabaseClient.from("teams").insert(rows);
+  if(error)throw error;
+ }
+}
+
+async function dbSaveChampions(){
+ if(!onlineReady)return;
+ await supabaseClient.from("champions").delete().gte("competition_number",0);
+ const rows=(state.champions||[]).map(c=>{
+  const p=state.players.find(x=>x.id===c.id||x.name===c.name);
+  if(!p||!p.id)return null;
+  return {
+   user_id:p.id,
+   competition_number:c.comp||state.competition,
+   rollover_number:c.rollover||0
+  };
+ }).filter(Boolean);
+ if(rows.length){
+  const {error}=await supabaseClient.from("champions").insert(rows);
+  if(error)throw error;
+ }
+}
+
 async function dbSyncAll(){
  if(!onlineReady)return;
  await dbSaveSettings();
+ await dbSaveTeams();
+ await dbSaveChampions();
  for(const p of state.players){await dbUpsertPlayer(p);}
 }
 
