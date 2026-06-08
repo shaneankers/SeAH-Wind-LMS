@@ -1863,7 +1863,27 @@ async function factoryResetKeepAdmin(){
  }
 }
 
-function saveSettings(){state.entryFee=Number(document.getElementById("entryFee").value||5);state.deadline=document.getElementById("deadline").value.trim();state.rules=document.getElementById("rulesText").value.trim();save()}
+async function saveSettings(){
+ const oldSettings={entryFee:state.entryFee,deadline:state.deadline,rules:state.rules,joinCode:state.joinCode};
+ state.entryFee=Number(document.getElementById("entryFee").value||5);
+ state.deadline=document.getElementById("deadline").value.trim();
+ state.rules=document.getElementById("rulesText").value.trim();
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ try{
+  await dbSaveSettings();
+  toast("Settings saved.");
+  render();
+ }catch(e){
+  state.entryFee=oldSettings.entryFee;
+  state.deadline=oldSettings.deadline;
+  state.rules=oldSettings.rules;
+  state.joinCode=oldSettings.joinCode;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  console.error(e);
+  toast("Could not save settings to database: "+(e.message||"unknown error"));
+  render();
+ }
+}
 function saveTeams(){state.teams=document.getElementById("teamsText").value.split("\n").map(x=>x.trim()).filter(Boolean);save()}
 function saveAdminAccount(){state.adminUsername=document.getElementById("adminUsername").value.trim();state.adminPassword=document.getElementById("adminPassword").value.trim();authUser.name=state.adminUsername;localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));save()}
 async function savePlayerAccount(){
@@ -1918,12 +1938,9 @@ async function changeJoinCode(){
  state.joinCode=newCode;
  localStorage.setItem(storeKey,JSON.stringify(state));
  try{
-  if(onlineReady){
-   const {error}=await supabaseClient.from("app_settings").update({join_code:newCode}).eq("id",1);
-   if(error)throw error;
-  }
+  await saveJoinCodeToDatabase(newCode);
   toast("Join code updated.");
-  render();
+  await dbLoad();
  }catch(e){
   state.joinCode=oldCode;
   localStorage.setItem(storeKey,JSON.stringify(state));
@@ -1931,6 +1948,21 @@ async function changeJoinCode(){
   toast("Could not save join code to database: "+(e.message||"unknown error"));
   render();
  }
+}
+
+async function saveJoinCodeToDatabase(newCode){
+ if(!onlineReady)throw new Error("Database is not connected.");
+ const {data,error}=await supabaseClient
+  .from("app_settings")
+  .update({join_code:newCode})
+  .eq("id",1)
+  .select("id,join_code")
+  .maybeSingle();
+ if(error)throw error;
+ if(!data||data.join_code!==newCode){
+  throw new Error("Database did not accept the join code update. Check app_settings update policy.");
+ }
+ return data;
 }
 function copyInvite(){
  const msg="Join SeAH Wind LMS\\nCreate your account using join code: "+state.joinCode;
@@ -2200,8 +2232,10 @@ async function dbSaveSettings(){
   entry_fee:state.entryFee,
   deadline:state.deadline,
   rules:state.rules
- }).eq("id",1);
+ }).eq("id",1).select("id,join_code,entry_fee,deadline,rules").maybeSingle();
  if(settingsRes.error)throw settingsRes.error;
+ if(!settingsRes.data)throw new Error("Settings were not saved. Check app_settings update policy.");
+ if(settingsRes.data.join_code!==state.joinCode)throw new Error("Join code was not saved to database.");
 
  if(state.activeCompetitionId){
   const compRes=await supabaseClient.from("competitions").update({
