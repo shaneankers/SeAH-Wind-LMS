@@ -1313,7 +1313,18 @@ function competition(){
  <div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${standing.length}</span></div><div class="card-body list">${standing.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div>
  <div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${eliminated.length}</span></div><div class="card-body list">${eliminated.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`;
 }
-function playerHall(){const r=defendingChampion(),champ=state.players.find(p=>p.name===r);return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">🏆 ${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${state.champions.length?state.champions.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">🏆 ${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`}
+function playerHall(){
+ const sortedChamps=[];
+ const seen=new Set();
+ (state.champions||[]).slice().sort((a,b)=>(Number(b.comp)||0)-(Number(a.comp)||0)).forEach(c=>{
+  const key=(c.id||c.name||"")+"|"+c.comp+"|"+(c.rollover||0);
+  if(!seen.has(key)){seen.add(key);sortedChamps.push(c);}
+ });
+ const r=sortedChamps.length?sortedChamps[0].name:"None";
+ const champ=state.players.find(p=>p.name===r);
+ return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">🏆 ${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">🏆 ${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
+}
+
 function rules(){return `<div class="card"><div class="card-head"><strong>Competition Info</strong></div><div class="card-body list"><div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div><div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div></div></div><div class="card"><div class="card-head"><strong>Rules</strong></div><div class="card-body"><p style="line-height:1.55;margin:0">${state.rules}</p></div></div>`}
 function playerSettings(){
  const p=currentPlayer();
@@ -1694,7 +1705,7 @@ function confirmPlayerPick(){
  toast("Pick submitted and locked.");
  save();
 }
-function processRound(){
+async function processRound(){
  const pending=alive().filter(p=>p.result==="pending");
  if(pending.length){
   toast("Mark result for: "+pending.map(p=>p.name).join(", "));
@@ -1738,7 +1749,10 @@ function processRound(){
 
  if(s.length===1){
   s[0].wins++;
-  state.champions.push({id:s[0].id,name:s[0].name,comp:state.competition,rollover:state.rollover||0});
+  const champRecord={id:s[0].id,name:s[0].name,comp:state.competition,rollover:state.rollover||0};
+  const champExists=(state.champions||[]).some(c=>(c.id===champRecord.id||c.name===champRecord.name)&&Number(c.comp)===Number(champRecord.comp)&&Number(c.rollover||0)===Number(champRecord.rollover||0));
+  if(!champExists)state.champions.push(champRecord);
+  await saveChampionRecord(champRecord);
   addActivity("round","Winner found: "+s[0].name,"Competition #"+state.competition);
   addAdminAlert("Winner found","Winner: "+s[0].name+". Admin action needed: send winner notification, sort prize money, then start the next competition when ready.");
   alert("Winner found: "+s[0].name+"\n\nAdmin action needed: sort prize money, then start the next competition when ready.");
@@ -2048,7 +2062,7 @@ async function dbLoad(){
    supabaseClient.from("player_state").select("*"),
    supabaseClient.from("pick_history").select("*"),
    supabaseClient.from("teams").select("*").order("league").order("team_name"),
-   supabaseClient.from("champions").select("*, app_users(display_name)").order("won_at",{ascending:true})
+   supabaseClient.from("champions").select("*, app_users(display_name)").order("competition_number",{ascending:false}).order("won_at",{ascending:false})
   ]);
 
   const results=[settingsRes, compsRes, usersRes, stateRes, historyRes, teamsRes, champsRes];
@@ -2121,12 +2135,19 @@ async function dbLoad(){
   state.leagues=leagues;
   state.teams=Object.values(leagues).flat();
 
-  state.champions=(champsRes.data||[]).map(c=>({
-   id:c.user_id,
-   name:c.app_users?.display_name||"Winner",
-   comp:c.competition_number,
-   rollover:c.rollover_number
-  }));
+  const champMap=new Map();
+  (champsRes.data||[]).forEach(c=>{
+   const key=(c.user_id||"")+"|"+c.competition_number+"|"+(c.rollover_number||0);
+   if(!champMap.has(key)){
+    champMap.set(key,{
+     id:c.user_id,
+     name:c.app_users?.display_name||"Winner",
+     comp:c.competition_number,
+     rollover:c.rollover_number||0
+    });
+   }
+  });
+  state.champions=Array.from(champMap.values()).sort((a,b)=>(Number(b.comp)||0)-(Number(a.comp)||0));
 
   if(authUser&&authUser.username){
    const me=state.players.find(p=>(p.username||"").toLowerCase()===authUser.username.toLowerCase());
@@ -2204,20 +2225,44 @@ async function dbSaveTeams(){
  }
 }
 
+async function saveChampionRecord(c){
+ if(!onlineReady||!c)return false;
+ const p=state.players.find(x=>x.id===c.id||x.name===c.name);
+ if(!p||!p.id)return false;
+ const row={
+  user_id:p.id,
+  competition_number:Number(c.comp||state.competition),
+  rollover_number:Number(c.rollover||0)
+ };
+ const {error}=await supabaseClient
+  .from("champions")
+  .upsert(row,{onConflict:"user_id,competition_number,rollover_number",ignoreDuplicates:true});
+ if(error){
+  console.error("Champion save failed",error);
+  toast("Winner saved locally, but Hall of Fame did not save: "+(error.message||"unknown error"));
+  return false;
+ }
+ return true;
+}
+
 async function dbSaveChampions(){
  if(!onlineReady)return;
- await supabaseClient.from("champions").delete().gte("competition_number",0);
+ const seen=new Set();
  const rows=(state.champions||[]).map(c=>{
   const p=state.players.find(x=>x.id===c.id||x.name===c.name);
   if(!p||!p.id)return null;
-  return {
+  const row={
    user_id:p.id,
-   competition_number:c.comp||state.competition,
-   rollover_number:c.rollover||0
+   competition_number:Number(c.comp||state.competition),
+   rollover_number:Number(c.rollover||0)
   };
+  const key=row.user_id+"|"+row.competition_number+"|"+row.rollover_number;
+  if(seen.has(key))return null;
+  seen.add(key);
+  return row;
  }).filter(Boolean);
  if(rows.length){
-  const {error}=await supabaseClient.from("champions").insert(rows);
+  const {error}=await supabaseClient.from("champions").upsert(rows,{onConflict:"user_id,competition_number,rollover_number",ignoreDuplicates:true});
   if(error)throw error;
  }
 }
