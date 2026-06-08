@@ -994,33 +994,54 @@ async function saveAdminAccount(){
  if(!username)return toast("Enter an admin username.");
  if(password&&password.length<4)return toast("Password must be at least 4 characters.");
 
- const oldUsername=authUser.username||state.adminUsername||authUser.name;
- const oldName=authUser.name||oldUsername;
+ const oldUsername=(authUser.username||state.adminUsername||authUser.name||"").trim();
+ const oldName=(authUser.name||oldUsername||"").trim();
+ if(!oldUsername)return toast("Could not identify the current admin username.");
 
  try{
-  if(onlineReady&&authUser.user_id){
-   const {error:updateError}=await supabaseClient
+  // Do not rely on onlineReady here. Login already uses Supabase directly, and in some
+  // builds onlineReady can stay false, which made this screen only save locally.
+  if(!supabaseClient)throw new Error("Supabase is not available.");
+
+  // Reset the password against the EXISTING username first. If the username is being
+  // changed, resetting against the new username can silently affect zero rows.
+  if(password){
+   const passRes=await supabaseClient.rpc("admin_reset_password_by_username",{
+    p_username:oldUsername,
+    p_new_password:password
+   });
+   if(passRes.error)throw passRes.error;
+  }
+
+  // Now update the admin account row itself and require Supabase to return the row.
+  if(authUser.user_id){
+   const updateRes=await supabaseClient
     .from("app_users")
     .update({
      username:username,
      display_name:username,
      must_reset_password:false
     })
-    .eq("id",authUser.user_id);
+    .eq("id",authUser.user_id)
+    .select("id,username,display_name,role,must_reset_password")
+    .maybeSingle();
 
-   if(updateError)throw updateError;
+   if(updateRes.error)throw updateRes.error;
+   if(!updateRes.data)throw new Error("Admin account was not updated in Supabase.");
+   if(updateRes.data.role!=="admin")throw new Error("Updated account is not an admin account.");
+  }else{
+   throw new Error("Missing admin user id. Please log out and back in as admin, then try again.");
+  }
 
-   if(password){
-    const {error:passError}=await supabaseClient.rpc("admin_reset_password_by_username",{
-     p_username:username,
-     p_new_password:password
-    });
-    if(passError)throw passError;
-
-    await supabaseClient
-     .from("app_users")
-     .update({must_reset_password:false})
-     .eq("id",authUser.user_id);
+  // If a password was entered, prove the new login really works before showing success.
+  if(password){
+   const verifyRes=await supabaseClient.rpc("app_login",{
+    p_username:username,
+    p_password:password
+   });
+   if(verifyRes.error)throw verifyRes.error;
+   if(!verifyRes.data||!verifyRes.data.length||verifyRes.data[0].role!=="admin"){
+    throw new Error("Supabase did not accept the new admin login. The change was not confirmed.");
    }
   }
 
@@ -1043,11 +1064,12 @@ async function saveAdminAccount(){
 
   if(state.selectedPlayer===oldUsername||state.selectedPlayer===oldName)state.selectedPlayer=username;
 
-  toast("Admin login updated.");
-  save();
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  toast("Admin login updated and verified.");
+  render();
  }catch(e){
-  console.error(e);
-  toast("Could not save admin login: "+(e.message||"unknown error"));
+  console.error("Admin login update failed",e);
+  toast("Admin login was not saved: "+(e.message||"unknown error"));
  }
 }
 
