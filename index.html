@@ -1225,6 +1225,7 @@ function players(){
        <button class="small edit-only" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
          <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
+         <button class="small ${p.alive?'red':'green'}" onclick="toggleAlive(${i})">${p.alive?'Mark Dead':'Mark Alive'}</button>
          <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
          <button class="small secondary" onclick="renamePlayer(${i})">Rename</button>
          <button class="small yellow" onclick="resetPlayerPassword(${i})">Reset Password</button>
@@ -1613,6 +1614,25 @@ function togglePaid(i){
  p.paid=!p.paid;
  addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status updated");
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
+ save();
+}
+function toggleAlive(i){
+ const p=state.players[i];
+ if(!p)return toast("Player not found.");
+ p.alive=!p.alive;
+ if(p.alive){
+  p.outRound=null;
+  p.outPick=null;
+  if(!p.result||p.result==="lose")p.result="pending";
+  addActivity("player",p.name+" marked alive","Manual admin correction");
+  toast(p.name+" marked alive.");
+ }else{
+  p.outRound=state.round;
+  p.outPick=p.pick||p.outPick||null;
+  p.result="lose";
+  addActivity("player",p.name+" marked dead","Manual admin correction");
+  toast(p.name+" marked dead.");
+ }
  save();
 }
 function unlockPick(i){
@@ -2340,10 +2360,16 @@ async function dbSaveChampions(){
 
 async function dbSyncAll(){
  if(!onlineReady)return;
- await dbSaveSettings();
- await dbSaveTeams();
- await dbSaveChampions();
- for(const p of state.players){await dbUpsertPlayer(p);}
+ const errors=[];
+ for(const p of state.players){
+  try{await dbUpsertPlayer(p);}catch(e){errors.push(e);}
+ }
+ try{await dbSaveTeams();}catch(e){errors.push(e);}
+ try{await dbSaveChampions();}catch(e){errors.push(e);}
+ // Settings are saved explicitly from the Settings screen. Do not let an app_settings
+ // policy issue block player picks, round results, paid status, or admin corrections.
+ try{await dbSaveSettings();}catch(e){console.warn("Settings background save skipped",e);}
+ if(errors.length)throw errors[0];
 }
 
 const localSave=save;
