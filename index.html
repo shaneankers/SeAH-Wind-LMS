@@ -1466,7 +1466,7 @@ async function togglePlayerNotifications(){
  }catch(e){
   console.error("Notification toggle failed",e);
   toast("Could not enable notifications: "+(e.message||"unknown error"));
-  await dbLoad();
+  await syncUsersFromSupabase();
   render();
  }
 }
@@ -1938,7 +1938,7 @@ async function factoryResetKeepAdmin(){
   }
   page="dashboard";
   toast("Factory reset complete. Admin account kept.");
-  if(onlineReady)await dbLoad(); else render();
+  if(onlineReady)await syncUsersFromSupabase(); else render();
  }catch(e){
   console.error(e);
   toast("Factory reset failed: "+(e.message||"unknown error"));
@@ -2023,7 +2023,7 @@ async function loginUser(){
   authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
-  await dbLoad();
+  await syncUsersFromSupabase();
   const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
   if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
   if(u.role==="admin"){
@@ -2056,7 +2056,7 @@ async function loginAdmin(){
   adminView="admin";
   localStorage.setItem("seah_admin_view_current",adminView);
   page="dashboard";
-  await dbLoad();
+  await syncUsersFromSupabase();
   const loggedInAdmin=state.players.find(p=>p.id===data[0].user_id);
   if(loggedInAdmin)loggedInAdmin.notifications=data[0].notifications_enabled===false?false:true;
   render();
@@ -2082,7 +2082,7 @@ async function createAccount(){
   authUser={name:u.display_name,username:u.username,role:"player",user_id:u.user_id,must_reset_password:false};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
-  await dbLoad();
+  await syncUsersFromSupabase();
   state.selectedPlayer=u.display_name;
   page="myPick";
   render();
@@ -2098,7 +2098,7 @@ async function boot(){
   try{authUser=JSON.parse(saved);currentUserId=authUser.user_id||null;}catch(e){}
  }
  render();
- await dbLoad();
+ await syncUsersFromSupabase();
 }
 
 
