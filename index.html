@@ -1483,7 +1483,7 @@ function addAppGuide(){
  if(el)el.style.display=el.style.display==="none"?"block":"none";
 }
 
-function settings(){ensureLeagues();return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${state.adminUsername}"><label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value="${state.adminPassword}"><br><br><button onclick="saveAdminAccount()">Save Admin Login</button></div></div>
+function settings(){ensureLeagues();const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${adminUsername}"><label style="margin-top:12px">New Password</label><input id="adminPassword" type="password" value="" placeholder="Leave blank to keep current password"><br><br><button onclick="saveAdminAccount()">Save Admin Login</button><div class="muted" style="margin-top:10px">Admin login is saved to Supabase. Leave password blank unless you want to change it.</div></div></div>
 
 <div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body"><div class="item"><div><div class="item-title">${state.joinCode}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div><br><button onclick="copyInvite()">Copy Invite Message</button></div></div>
 
@@ -1830,7 +1830,15 @@ async function factoryResetKeepAdmin(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  const pass=prompt("Enter admin password to confirm Factory Reset:");
  if(pass===null)return;
- if(pass!==state.adminPassword)return toast("Incorrect admin password.");
+ try{
+  const loginName=(authUser&&authUser.username)||state.adminUsername||authUser.name;
+  const loginCheck=await supabaseClient.rpc("app_login",{p_username:loginName,p_password:pass});
+  if(loginCheck.error)throw loginCheck.error;
+  if(!loginCheck.data||!loginCheck.data.length||loginCheck.data[0].role!=="admin")return toast("Incorrect admin password.");
+ }catch(e){
+  console.error(e);
+  return toast("Incorrect admin password.");
+ }
  if(!confirm("Factory Reset will delete all players, picks, payments, activity logs and competition history. The admin account and settings will be kept. Continue?"))return;
  try{
   const adminId=authUser.user_id;
@@ -1906,7 +1914,37 @@ async function saveSettings(){
  }
 }
 function saveTeams(){state.teams=document.getElementById("teamsText").value.split("\n").map(x=>x.trim()).filter(Boolean);save()}
-function saveAdminAccount(){state.adminUsername=document.getElementById("adminUsername").value.trim();state.adminPassword=document.getElementById("adminPassword").value.trim();authUser.name=state.adminUsername;localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));save()}
+async function saveAdminAccount(){
+ if(!authUser||authUser.role!=="admin"||!authUser.user_id)return toast("Admin only.");
+ const newUsername=(document.getElementById("adminUsername")?.value||"").trim();
+ const newPassword=(document.getElementById("adminPassword")?.value||"").trim();
+ if(!newUsername)return toast("Admin username is required.");
+ if(newPassword && newPassword.length<4)return toast("Password must be at least 4 characters.");
+ try{
+  const {error:updateError}=await supabaseClient
+   .from("app_users")
+   .update({username:newUsername,display_name:newUsername})
+   .eq("id",authUser.user_id);
+  if(updateError)throw updateError;
+
+  if(newPassword){
+   const {error:passError}=await supabaseClient.rpc("app_change_password",{p_user_id:authUser.user_id,p_new_password:newPassword});
+   if(passError)throw passError;
+  }
+
+  state.adminUsername=newUsername;
+  state.adminPassword="";
+  authUser.username=newUsername;
+  authUser.name=newUsername;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  toast(newPassword?"Admin login and password saved.":"Admin username saved.");
+  await dbLoad();
+ }catch(e){
+  console.error(e);
+  toast("Could not save admin login: "+(e.message||"unknown error"));
+ }
+}
 async function savePlayerAccount(){
  const p=currentPlayer();
  const oldName=p.name;
@@ -2186,6 +2224,8 @@ async function dbLoad(){
    const me=(usersRes.data||[]).find(u=>u.id===authUser.user_id);
    if(me){
     authUser.name=me.display_name||me.username;
+    authUser.username=me.username||authUser.username;
+    if(me.role==="admin")state.adminUsername=me.username||me.display_name||state.adminUsername;
     authUser.must_reset_password=!!me.must_reset_password;
     authUser.notifications_enabled=me.notifications_enabled===false?false:true;
     localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
