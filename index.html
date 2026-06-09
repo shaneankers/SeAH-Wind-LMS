@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v71 merged fix: shared Latest News RPC, admin/player visibility, safer notifications, mobile news layout -->
+<!-- v72 push registration + latest news visibility fix: no copy fallback, preserves service worker, current picks shown -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1398,7 +1398,13 @@ function render(){
 function setPage(p){
  page=p;
  render();
- if(authUser&&authUser.role==="admin"&&(p==="players"||p==="dashboard")){
+ if(p==="latestNews"||p==="myPick"||p==="competition"||p==="previous"){
+  Promise.resolve()
+   .then(()=>loadAppSettingsFromSupabase())
+   .then(()=>syncUsersFromSupabase())
+   .then(()=>render())
+   .catch(e=>console.warn("Page refresh sync failed",e));
+ }else if(authUser&&authUser.role==="admin"&&(p==="players"||p==="dashboard")){
   syncUsersAndRender();
  }
 }
@@ -1573,8 +1579,9 @@ Recipients: ${recipientNames}`;
  if(pushed){
   toast("Notification sent.");
  }else{
-  openCopyModal(fullMessage);
-  toast("Push was not confirmed, so the message is ready to copy.");
+  toast("Push notification failed/not confirmed. Check player device notification registration.");
+  addAdminAlert("Push notification failed",(pushError||"No confirmed push delivery")+". Ask players to open the app once so the device can register for notifications.");
+  await dbSaveActivityLog();
  }
  render();
 }
@@ -1750,9 +1757,20 @@ function myPick(){
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
  </div></div>`;
 }
+function currentRoundPickSummary(){
+ const rows=(state.players||[])
+  .filter(p=>p&&p.approved&&p.paid&&!isQueuedForNextCompetition(p))
+  .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),undefined,{sensitivity:"base"}));
+ if(!rows.length)return `<div class="notice">No active paid players found yet.</div>`;
+ return rows.map(p=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon("pick")}</div><div><div class="activity-main">${escapeHtml(p.name||"Player")}</div><div class="activity-sub">${p.pick?`Picked ${escapeHtml(p.pick)}`:"No pick submitted yet"}</div></div></div><div class="activity-time">Round ${state.round}</div></div>`).join("");
+}
 function latestNews(){
  ensureActivityLog();
  return `<div class="card news-card">
+  <div class="card-head"><strong>Current Round Picks</strong><span class="badge orange">Round ${state.round}</span></div>
+  <div class="card-body"><div class="activity-list">${currentRoundPickSummary()}</div></div>
+ </div>
+ <div class="card news-card">
   <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
   <div class="card-body">
    <div class="activity-list">
@@ -1927,6 +1945,25 @@ async function registerPushSubscription(){
 
  if(error)throw error;
  return true;
+}
+
+async function ensurePushRegistered(canPrompt){
+ // A database notification setting means the user wants notifications, but each phone
+ // still needs a browser push subscription. We try to create/refresh that subscription
+ // automatically after login when possible. Browsers may still require a permission prompt.
+ if(!authUser||authUser.notifications_enabled===false)return false;
+ const p=currentPlayer();
+ if(p&&p.notifications===false)return false;
+ if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return false;
+ if(Notification.permission==="denied")return false;
+ if(Notification.permission==="default"&&!canPrompt)return false;
+ try{
+  await registerPushSubscription();
+  return true;
+ }catch(e){
+  console.warn("Automatic push registration failed",e);
+  return false;
+ }
 }
 
 async function unregisterPushSubscription(){
@@ -3040,6 +3077,7 @@ async function loginUser(){
   await loadChampionRecords();
   const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
   if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
+  await ensurePushRegistered(true);
   render();
  }catch(e){
   console.error("Post-login render/sync failed",e);
@@ -3153,6 +3191,7 @@ async function createAccount(){
   state.selectedPlayer=u.display_name||u.username||name;
   page="myPick";
   localStorage.setItem(storeKey,JSON.stringify(state));
+  await ensurePushRegistered(true);
   render();
  }catch(e){
   console.error("Post-create render/sync failed",e);
@@ -3240,6 +3279,7 @@ async function boot(){
  render();
  await syncUsersFromSupabase();
  await loadChampionRecords();
+ await ensurePushRegistered(false);
  render();
 }
 
@@ -3247,12 +3287,8 @@ async function boot(){
 
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
-  // v49: clear old PWA cache/service worker so GitHub Pages serves the latest index.html.
-  // Old cached builds made the Settings Save buttons appear unchanged after upload.
-  try{
-   const regs=await navigator.serviceWorker.getRegistrations();
-   for(const reg of regs){await reg.unregister();}
-  }catch(e){console.warn("Service worker unregister failed",e);}
+  // Do not unregister the service worker on every load. Push notifications depend on it.
+  // We only clear browser caches so GitHub Pages can serve the latest app shell.
   try{
    if(window.caches){
     const keys=await caches.keys();
