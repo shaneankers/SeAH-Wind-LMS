@@ -1899,6 +1899,27 @@ function urlBase64ToUint8Array(base64String){
  return outputArray;
 }
 
+async function preAskNotificationPermission(){
+ // Ask at the moment the player clicks Create Account/Login, before long async work.
+ // Some mobile browsers only allow the permission prompt while still inside a user action.
+ if(!("Notification" in window))return false;
+ if(Notification.permission!=="default")return Notification.permission==="granted";
+ const ok=window.confirm("Please keep notifications turned on for the best experience. This lets you receive pick reminders and competition updates.");
+ if(!ok)return false;
+ try{
+  const permission=await Notification.requestPermission();
+  if(permission==="granted"){
+   toast("Notifications allowed. Registering this device...");
+   return true;
+  }
+  toast("Notifications were not allowed on this device.");
+  return false;
+ }catch(e){
+  console.warn("Notification permission request failed",e);
+  return false;
+ }
+}
+
 async function registerPushSubscription(){
  if(!("Notification" in window))throw new Error("Notifications are not supported on this device/browser.");
  if(!("serviceWorker" in navigator))throw new Error("Service workers are not supported on this device/browser.");
@@ -3043,6 +3064,7 @@ async function loginUser(){
  const pin=document.getElementById("loginPin").value.trim();
  const remember=document.getElementById("rememberMe").checked;
  if(!name||!pin)return toast("Enter username and password.");
+ await preAskNotificationPermission();
  let u=null;
  try{
   const {data,error}=await supabaseClient.rpc("app_login",{p_username:name,p_password:pin});
@@ -3118,6 +3140,7 @@ async function createAccount(){
  const remember=document.getElementById("createRemember").checked;
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
+ await preAskNotificationPermission();
 
  let u=null;
  try{
