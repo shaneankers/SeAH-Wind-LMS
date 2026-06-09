@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v60 settings load RPC fix -->
+<!-- v62 user sync restored for pending players -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -902,6 +902,112 @@ function noteText(key, extra={}){
  const data={entryFee:state.entryFee,round:state.round,deadline:state.deadline,competition:state.competition,winner:extra.winner||defendingChampion()};
  return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
 }
+
+
+async function syncUsersFromSupabase(){
+ try{
+  if(!supabaseClient)return false;
+  if(!onlineReady)setOnlineStatus(true,"Database connected");
+
+  const usersRes=await supabaseClient
+   .from("app_users")
+   .select("id,username,display_name,role,approved,notifications_enabled")
+   .eq("role","player")
+   .order("display_name",{ascending:true});
+
+  if(usersRes.error)throw usersRes.error;
+  const users=Array.isArray(usersRes.data)?usersRes.data:[];
+
+  let stateRows=[];
+  try{
+   const stateRes=await supabaseClient
+    .from("player_state")
+    .select("user_id,paid,alive,wins,pick,locked,result,previous,out_round,out_pick");
+   if(!stateRes.error&&Array.isArray(stateRes.data))stateRows=stateRes.data;
+   else if(stateRes.error)console.warn("Player state sync skipped",stateRes.error);
+  }catch(e){
+   console.warn("Player state sync skipped",e);
+  }
+
+  const stateByUserId=new Map(stateRows.map(r=>[r.user_id,r]));
+  let changed=false;
+
+  users.forEach(u=>{
+   const existing=state.players.find(p=>p.id===u.id)
+    ||state.players.find(p=>(p.username||"").toLowerCase()===(u.username||"").toLowerCase())
+    ||state.players.find(p=>(p.name||"").toLowerCase()===(u.display_name||u.username||"").toLowerCase());
+
+   const ps=stateByUserId.get(u.id)||{};
+   const target=existing||{
+    id:u.id,
+    username:u.username,
+    name:u.display_name||u.username,
+    approved:!!u.approved,
+    paid:false,
+    alive:true,
+    wins:0,
+    pick:"",
+    locked:false,
+    result:"pending",
+    previous:[],
+    outRound:null,
+    outPick:null,
+    notifications:u.notifications_enabled!==false
+   };
+
+   if(!existing){
+    state.players.push(target);
+    changed=true;
+   }
+
+   const updates={
+    id:u.id,
+    username:u.username||target.username||target.name,
+    name:u.display_name||u.username||target.name,
+    approved:!!u.approved,
+    paid:typeof ps.paid==="boolean"?ps.paid:!!target.paid,
+    alive:typeof ps.alive==="boolean"?ps.alive:(target.alive!==false),
+    wins:typeof ps.wins==="number"?ps.wins:Number(target.wins||0),
+    pick:ps.pick||target.pick||"",
+    locked:typeof ps.locked==="boolean"?ps.locked:!!target.locked,
+    result:ps.result||target.result||"pending",
+    previous:Array.isArray(ps.previous)?ps.previous:(Array.isArray(target.previous)?target.previous:[]),
+    outRound:ps.out_round??target.outRound??null,
+    outPick:ps.out_pick??target.outPick??null,
+    notifications:u.notifications_enabled!==false
+   };
+
+   Object.keys(updates).forEach(k=>{
+    const next=updates[k];
+    const cur=target[k];
+    const different=Array.isArray(next)
+     ? JSON.stringify(cur||[])!==JSON.stringify(next)
+     : cur!==next;
+    if(different){
+     target[k]=next;
+     changed=true;
+    }
+   });
+  });
+
+  if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
+  return changed;
+ }catch(e){
+  console.error("Could not sync users from Supabase",e);
+  toast("Could not sync users from Supabase: "+(e.message||"unknown error"));
+  return false;
+ }
+}
+
+async function syncUsersAndRender(){
+ try{
+  const changed=await syncUsersFromSupabase();
+  if(changed)render();
+ }catch(e){
+  console.error("User sync/render failed",e);
+ }
+}
+
 
 function announcementTextVersionFallback(){
  const text=(state.announcement||"").trim();
