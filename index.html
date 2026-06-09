@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v73 targeted cleanup: removed Current Round Picks card, factory reset clears champions, auto-refresh push subscription -->
+<!-- v75 notification template + account push registration fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1536,10 +1536,38 @@ function recipientLine(type){
  if(type==="winner"||type==="rollover")return `<div class="recipient-line">Recipients: <strong>All</strong> players</div>`;
  return `<div class="recipient-line">Recipients: <strong>${targets.length}</strong> ${targets.length===1?"player":"players"}</div>`;
 }
+function notificationTemplateKey(type){
+ if(type==="missing"||type==="missingPick")return "missingPick";
+ if(type==="unpaid")return "unpaid";
+ if(type==="winner")return "winner";
+ if(type==="rollover")return "rollover";
+ return type;
+}
+function notificationTitle(type){
+ if(type==="unpaid")return "Payment Reminder";
+ if(type==="missing"||type==="missingPick")return "Pick Reminder";
+ if(type==="winner")return "Winner Announcement";
+ if(type==="rollover")return "Rollover Announcement";
+ return "SeAH Wind LMS";
+}
+async function notificationMessageFromSettings(type){
+ // Always refresh settings immediately before sending so the push text matches
+ // the Notification Messages saved in Admin Settings, not an old local copy.
+ try{await loadAppSettingsFromSupabase();}catch(e){console.warn("Could not refresh notification settings",e);}
+ const key=notificationTemplateKey(type);
+ const extra=key==="winner"?{winner:defendingChampion()}:{};
+ const msg=noteText(key,extra).trim();
+ if(!msg)throw new Error("No notification message saved in Settings for "+key+".");
+ return msg;
+}
+
 async function notifyGroup(type,targets,message){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  targets=Array.isArray(targets)?targets:[];
  if(!targets.length)return toast("No matching players to notify.");
+
+ try{message=await notificationMessageFromSettings(type);}
+ catch(e){console.error(e);return toast(e.message||"Notification message missing from Settings.");}
 
  const recipientNames=targets.map(p=>p.name).join(", ");
  const fullMessage=`${message}
@@ -1557,10 +1585,10 @@ Recipients: ${recipientNames}`;
     "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
    },
    body:JSON.stringify({
-    type,
+    type:notificationTemplateKey(type),
     user_ids:targets.map(p=>p.id).filter(Boolean),
-    title:"SeAH Wind LMS",
-    message
+    title:notificationTitle(type),
+    message:message
    })
   });
   pushed=res.ok;
@@ -3174,9 +3202,21 @@ async function createAccount(){
    role:u.role||"player",
    user_id:u.user_id,
    must_reset_password:!!u.must_reset_password,
-   notifications_enabled:u.notifications_enabled===false?false:true
+   notifications_enabled:true
   };
   currentUserId=u.user_id;
+
+  // New accounts should start with notifications enabled in the database.
+  // The browser permission prompt still depends on the device/browser, but the
+  // user should not need to toggle the app setting off and on to register.
+  try{
+   const noteRes=await supabaseClient.rpc("app_set_notifications_by_username",{
+    p_username:u.username||name,
+    p_enabled:true
+   });
+   if(noteRes.error)console.warn("Could not set notifications enabled for new account",noteRes.error);
+  }catch(e){console.warn("Could not set notifications enabled for new account",e);}
+
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
 
   await loadAppSettingsFromSupabase();
@@ -3202,7 +3242,7 @@ async function createAccount(){
     previous:[],
     outRound:null,
     outPick:null,
-    notifications:u.notifications_enabled===false?false:true
+    notifications:true
    };
    state.players.push(p);
   }
