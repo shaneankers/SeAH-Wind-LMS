@@ -2472,23 +2472,79 @@ async function createAccount(){
  const remember=document.getElementById("createRemember").checked;
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
+
+ let u=null;
  try{
   const {data,error}=await supabaseClient.rpc("app_register",{p_username:name,p_password:pin,p_join_code:code});
   if(error)throw error;
-  if(!data||!data.length)return toast("Could not create account.");
-  const u=data[0];
-  authUser={name:u.display_name,username:u.username,role:"player",user_id:u.user_id,must_reset_password:false};
+  if(!data||!data.length)throw new Error("Could not create account.");
+  u=data[0];
+ }catch(registerError){
+  // Some older Supabase register functions create the account successfully, then throw
+  // while doing a secondary user/player sync. If that happens, prove the account exists
+  // by logging in with the details just entered instead of showing a false failure.
+  console.warn("Account register returned an error; checking whether login now works",registerError);
+  try{
+   const loginCheck=await supabaseClient.rpc("app_login",{p_username:name,p_password:pin});
+   if(loginCheck.error)throw loginCheck.error;
+   if(!loginCheck.data||!loginCheck.data.length)throw registerError;
+   u=loginCheck.data[0];
+   toast("Account created. Finishing login...");
+  }catch(loginAfterRegisterError){
+   console.error("Create account failed",registerError);
+   return toast(registerError.message||"Could not create account.");
+  }
+ }
+
+ // From here, account creation/login has succeeded. Do not turn a dashboard sync issue
+ // into a failed account creation message.
+ try{
+  authUser={
+   name:u.display_name,
+   username:u.username,
+   role:u.role||"player",
+   user_id:u.user_id,
+   must_reset_password:!!u.must_reset_password,
+   notifications_enabled:u.notifications_enabled===false?false:true
+  };
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+
   await loadAppSettingsFromSupabase();
   await loadAnnouncementDismissalsForUser();
-  await syncUsersFromSupabase();
-  state.selectedPlayer=u.display_name;
+
+  try{await syncUsersFromSupabase();}
+  catch(syncErr){console.warn("Post-create user sync skipped",syncErr);}
+
+  let p=state.players.find(x=>x.id===u.user_id||(x.username||"").toLowerCase()===name.toLowerCase());
+  if(!p){
+   p={
+    id:u.user_id,
+    username:u.username||name,
+    name:u.display_name||u.username||name,
+    approved:!!u.approved,
+    paid:false,
+    alive:true,
+    wins:0,
+    pick:"",
+    locked:false,
+    result:"pending",
+    previous:[],
+    outRound:null,
+    outPick:null,
+    notifications:u.notifications_enabled===false?false:true
+   };
+   state.players.push(p);
+  }
+
+  state.selectedPlayer=u.display_name||u.username||name;
   page="myPick";
+  localStorage.setItem(storeKey,JSON.stringify(state));
   render();
  }catch(e){
-  console.error(e);
-  toast(e.message||"Could not create account.");
+  console.error("Post-create render/sync failed",e);
+  toast("Account created. Refreshing dashboard...");
+  setTimeout(()=>location.reload(),500);
  }
 }
 
