@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v62 user sync restored for pending players -->
+<!-- v64 announcement dismiss uses text-aware version -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1009,16 +1009,25 @@ async function syncUsersAndRender(){
 }
 
 
-function announcementTextVersionFallback(){
- const text=(state.announcement||"").trim();
- if(!text)return 0;
+function announcementVersionHash(value){
+ const text=String(value||"");
  let hash=0;
  for(let i=0;i<text.length;i++){hash=((hash*31)+text.charCodeAt(i))>>>0;}
  return hash||1;
 }
+function announcementTextVersionFallback(){
+ const text=(state.announcement||"").trim();
+ if(!text)return 0;
+ return announcementVersionHash(text);
+}
 function currentAnnouncementVersion(){
+ const text=(state.announcement||"").trim();
+ if(!text)return 0;
  const dbVersion=Number(state.announcementVersion||0)||0;
- return dbVersion||announcementTextVersionFallback();
+ // Use a combined key so a changed announcement text is never hidden just because
+ // Supabase announcement_version stayed the same. This fixes users who dismissed
+ // version 1 and then could not see later announcement text that was also version 1.
+ return announcementVersionHash(dbVersion+":"+text);
 }
 function announcementDismissLocalKey(){
  const id=(authUser&&authUser.user_id)||"guest";
