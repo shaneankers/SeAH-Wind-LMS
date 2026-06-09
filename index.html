@@ -1419,15 +1419,42 @@ function ensureActivityLog(){
  if(!Array.isArray(state.activityLog))state.activityLog=[];
  if(state.activityLog.length>ACTIVITY_LIMIT)state.activityLog=state.activityLog.slice(0,ACTIVITY_LIMIT);
 }
+function makeActivityId(entry){
+ return [entry.time||"",entry.type||"",entry.title||"",entry.detail||""].join("|");
+}
+function normaliseActivityEntry(entry){
+ const e={
+  id:entry&&entry.id?String(entry.id):"",
+  type:(entry&&entry.type)||"info",
+  title:(entry&&entry.title)||"Activity",
+  detail:(entry&&entry.detail)||"",
+  time:(entry&&entry.time)||new Date().toISOString()
+ };
+ if(!e.id)e.id=makeActivityId(e);
+ return e;
+}
+function mergeActivityLogs(){
+ const map=new Map();
+ Array.from(arguments).flat().filter(Boolean).forEach(raw=>{
+  const e=normaliseActivityEntry(raw);
+  map.set(e.id,e);
+ });
+ return Array.from(map.values())
+  .sort((a,b)=>new Date(b.time).getTime()-new Date(a.time).getTime())
+  .slice(0,ACTIVITY_LIMIT);
+}
 function addActivity(type,title,detail){
  ensureActivityLog();
- state.activityLog.unshift({
+ const entry=normaliseActivityEntry({
   type:type||"info",
   title:title||"Activity",
   detail:detail||"",
   time:new Date().toISOString()
  });
- state.activityLog=state.activityLog.slice(0,ACTIVITY_LIMIT);
+ state.activityLog=mergeActivityLogs([entry],state.activityLog);
+ if(!Array.isArray(state.pendingActivityLog))state.pendingActivityLog=[];
+ state.pendingActivityLog=mergeActivityLogs([entry],state.pendingActivityLog).slice(0,50);
+ localStorage.setItem(storeKey,JSON.stringify(state));
 }
 function activityIcon(type){
  const map={pick:"ball",paid:"money",player:"users",round:"trophy",notify:"bell",info:"check"};
@@ -2667,19 +2694,45 @@ async function dbSaveActivityLog(){
  if(!supabaseClient)return false;
  if(!onlineReady)setOnlineStatus(true,"Database connected");
  ensureActivityLog();
+ const pending=Array.isArray(state.pendingActivityLog)&&state.pendingActivityLog.length
+  ? state.pendingActivityLog.map(normaliseActivityEntry)
+  : (state.activityLog||[]).slice(0,3).map(normaliseActivityEntry);
+ if(!pending.length)return true;
  try{
+  // Preferred safe path: merge new entries inside Supabase so one player's phone
+  // cannot overwrite another player's latest-news entry with stale localStorage.
+  const rpc=await supabaseClient.rpc("append_activity_log",{p_entries:pending});
+  if(!rpc.error){
+   state.pendingActivityLog=[];
+   await loadAppSettingsFromSupabase();
+   localStorage.setItem(storeKey,JSON.stringify(state));
+   return true;
+  }
+  const msg=String(rpc.error.message||"").toLowerCase();
+  if(!msg.includes("function")&&!msg.includes("append_activity_log"))throw rpc.error;
+
+  // Fallback for older databases without the RPC: read current shared feed, merge,
+  // then write the merged feed. This is less race-proof but still avoids local-only news.
+  const read=await supabaseClient.from("app_settings").select("activity_log,admin_alerts").eq("id",1).maybeSingle();
+  if(read.error)throw read.error;
+  const shared=Array.isArray(read.data?.activity_log)?read.data.activity_log:[];
+  const merged=mergeActivityLogs(pending,state.activityLog||[],shared);
   const {error}=await supabaseClient
    .from("app_settings")
    .update({
-    activity_log:(state.activityLog||[]).slice(0,ACTIVITY_LIMIT),
-    admin_alerts:Array.isArray(state.adminAlerts)?state.adminAlerts:[],
+    activity_log:merged,
+    admin_alerts:Array.isArray(state.adminAlerts)?state.adminAlerts:(Array.isArray(read.data?.admin_alerts)?read.data.admin_alerts:[]),
     updated_at:new Date().toISOString()
    })
    .eq("id",1);
   if(error)throw error;
+  state.activityLog=merged;
+  state.pendingActivityLog=[];
+  localStorage.setItem(storeKey,JSON.stringify(state));
   return true;
  }catch(e){
-  console.warn("Latest News save skipped. Run the v67 SQL repair if news does not sync.",e);
+  console.warn("Latest News save failed",e);
+  toast("Latest News did not sync: "+(e.message||"check Supabase SQL"));
   return false;
  }
 }
@@ -2907,10 +2960,13 @@ async function saveNow(){
     }catch(settingsErr){
      console.warn("Settings save skipped/failed during saveNow",settingsErr);
     }
+    await dbSaveActivityLog();
    }else{
-    // Player actions only save that player's state. Do not let a player phone overwrite settings.
+    // Player actions save that player's state AND append their latest-news entry.
+    // They still must not overwrite Settings/Rules/Teams.
     const p=currentPlayer();
     if(p&&p.id)await dbUpsertPlayer(p);
+    await dbSaveActivityLog();
    }
   }
  }catch(e){
@@ -3129,7 +3185,7 @@ async function loadAppSettingsFromSupabase(){
   if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
   if(typeof data.disclaimer!=="undefined"&&data.disclaimer!==null)state.disclaimer=data.disclaimer;
   if(data.leagues&&typeof data.leagues==="object")state.leagues=data.leagues;
-  if(Array.isArray(data.activity_log))state.activityLog=data.activity_log.slice(0,ACTIVITY_LIMIT);
+  if(Array.isArray(data.activity_log))state.activityLog=mergeActivityLogs(data.activity_log,state.pendingActivityLog||[]);
   if(Array.isArray(data.admin_alerts))state.adminAlerts=data.admin_alerts;
   if(Array.isArray(data.teams))state.teams=data.teams;
   else if(state.leagues)state.teams=Object.values(state.leagues).flat();
