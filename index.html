@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v65 audit fixes: trusted Supabase sync, cross-device refresh, competition state sync -->
+<!-- v66 audit fixes: safer sync, working admin notification buttons, forced password reset and copy modal helpers -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -920,9 +920,19 @@ async function syncUsersFromSupabase(){
 
   let stateRows=[];
   try{
-   const stateRes=await supabaseClient
+   let stateRes=await supabaseClient
     .from("player_state")
     .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,locked,result,previous,out_round,out_pick");
+
+   // Some existing Supabase databases do not have the newer locked/out columns yet.
+   // Fall back to the older schema instead of letting every player sync fail.
+   if(stateRes.error){
+    console.warn("Full player_state sync failed, trying older schema",stateRes.error);
+    stateRes=await supabaseClient
+     .from("player_state")
+     .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,result,previous");
+   }
+
    if(!stateRes.error&&Array.isArray(stateRes.data))stateRows=stateRes.data;
    else if(stateRes.error)console.warn("Player state sync skipped",stateRes.error);
   }catch(e){
@@ -989,7 +999,8 @@ async function syncUsersFromSupabase(){
     alive:hasPlayerState?(ps.alive!==false):(target.alive!==false),
     wins:hasPlayerState?Number(ps.wins||0):Number(target.wins||0),
     pick:hasPlayerState?(ps.pick??""):(target.pick||""),
-    locked:hasPlayerState?(ps.locked===true):!!target.locked,
+    // If the database has no locked column yet, treat an existing pick as locked.
+    locked:hasPlayerState?(("locked" in ps)?(ps.locked===true):!!ps.pick):!!target.locked,
     result:hasPlayerState?(ps.result??"pending"):(target.result||"pending"),
     previous:hasPlayerState?(Array.isArray(ps.previous)?ps.previous:[]):(Array.isArray(target.previous)?target.previous:[]),
     outRound:hasPlayerState?(ps.out_round??null):(target.outRound??null),
@@ -1237,6 +1248,42 @@ async function saveAdminAccount(){
 
 /* login functions replaced below */
 /* create account replaced below */
+async function completeForcedPasswordReset(){
+ if(!authUser)return toast("Please log in again.");
+ const p1=(document.getElementById("forcedNewPassword")?.value||"").trim();
+ const p2=(document.getElementById("forcedConfirmPassword")?.value||"").trim();
+ if(!p1||!p2)return toast("Enter and confirm your new password.");
+ if(p1!==p2)return toast("Passwords do not match.");
+ if(p1.length<4)return toast("Password must be at least 4 characters.");
+
+ const username=(authUser.username||authUser.name||"").trim();
+ if(!username)return toast("Could not identify your account.");
+
+ try{
+  const passRes=await supabaseClient.rpc("admin_reset_password_by_username",{
+   p_username:username,
+   p_new_password:p1
+  });
+  if(passRes.error)throw passRes.error;
+
+  if(authUser.user_id){
+   const updateRes=await supabaseClient
+    .from("app_users")
+    .update({must_reset_password:false})
+    .eq("id",authUser.user_id);
+   if(updateRes.error)throw updateRes.error;
+  }
+
+  authUser.must_reset_password=false;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  toast("Password updated.");
+  render();
+ }catch(e){
+  console.error("Forced password reset failed",e);
+  toast("Could not update password: "+(e.message||"unknown error"));
+ }
+}
+
 function logout(){authUser=null;localStorage.removeItem("seah_auth_user_current");page="dashboard";renderAuth()}
 function ensureAdminPlayer(){
  let p=(authUser&&authUser.user_id)?state.players.find(x=>x.id===authUser.user_id):null;
@@ -1404,6 +1451,61 @@ function recipientLine(type){
  if(type==="winner"||type==="rollover")return `<div class="recipient-line">Recipients: <strong>All</strong> players</div>`;
  return `<div class="recipient-line">Recipients: <strong>${targets.length}</strong> ${targets.length===1?"player":"players"}</div>`;
 }
+async function notifyGroup(type,targets,message){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ targets=Array.isArray(targets)?targets:[];
+ if(!targets.length)return toast("No matching players to notify.");
+
+ const recipientNames=targets.map(p=>p.name).join(", ");
+ const fullMessage=`${message}\n\nRecipients: ${recipientNames}`;
+
+ // Try the Supabase Edge Function if it exists. If it is not deployed or rejects the
+ // payload, still give the admin a copyable message instead of a broken button.
+ let pushed=false;
+ try{
+  const res=await fetch(PUSH_FUNCTION_URL,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    type,
+    user_ids:targets.map(p=>p.id).filter(Boolean),
+    title:"SeAH Wind LMS",
+    message
+   })
+  });
+  pushed=res.ok;
+ }catch(e){
+  console.warn("Push notification send skipped",e);
+ }
+
+ addActivity("notify",(pushed?"Sent ":"Prepared ")+type+" notification",targets.length+" recipient"+(targets.length===1?"":"s"));
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ openCopyModal(fullMessage);
+ toast(pushed?"Notification sent. Message also ready to copy.":"Message ready to copy. Push send was not confirmed.");
+ render();
+}
+
+function notifyUnpaid(){
+ const targets=announcementTargets("unpaid");
+ return notifyGroup("unpaid",targets,noteText("unpaid"));
+}
+
+function notifyMissingPicks(){
+ const targets=announcementTargets("missing");
+ return notifyGroup("missingPick",targets,noteText("missingPick"));
+}
+
+function notifyWinner(){
+ const targets=announcementTargets("winner");
+ const winner=defendingChampion();
+ return notifyGroup("winner",targets,noteText("winner",{winner}));
+}
+
+function notifyRollover(){
+ const targets=announcementTargets("rollover");
+ return notifyGroup("rollover",targets,noteText("rollover"));
+}
+
 function renderActivityRows(limit){
  ensureActivityLog();
  const visible=(state.activityLog||[]).slice(0,limit);
@@ -1847,6 +1949,30 @@ function copyInvite(){
   navigator.clipboard.writeText(msg).then(()=>toast("Invite message copied."),()=>openCopyModal(msg));
  }else{
   openCopyModal(msg);
+ }
+}
+
+function openCopyModal(msg){
+ const modal=document.getElementById("copyModal");
+ const box=document.getElementById("copyText");
+ if(box)box.value=msg||"";
+ if(modal)modal.style.display="flex";
+}
+
+function closeCopyModal(){
+ const modal=document.getElementById("copyModal");
+ if(modal)modal.style.display="none";
+}
+
+function manualCopy(){
+ const box=document.getElementById("copyText");
+ const msg=box?box.value:"";
+ if(!msg)return toast("Nothing to copy.");
+ if(navigator.clipboard&&navigator.clipboard.writeText){
+  navigator.clipboard.writeText(msg).then(()=>toast("Copied."),()=>toast("Select the text and copy manually."));
+ }else{
+  try{box.focus();box.select();document.execCommand("copy");toast("Copied.");}
+  catch(e){toast("Select the text and copy manually.");}
  }
 }
 
@@ -2416,6 +2542,8 @@ async function dbSaveSettings(){
   announcement:state.announcement||"",
   announcement_version:Number(state.announcementVersion||0)||0,
   disclaimer:state.disclaimer||"",
+  activity_log:Array.isArray(state.activityLog)?state.activityLog.slice(0,ACTIVITY_LIMIT):[],
+  admin_alerts:Array.isArray(state.adminAlerts)?state.adminAlerts:[],
   updated_at:new Date().toISOString()
  };
 
@@ -2444,6 +2572,8 @@ async function dbSaveSettings(){
    announcement:payload.announcement,
    announcement_version:payload.announcement_version,
    disclaimer:payload.disclaimer,
+   activity_log:payload.activity_log,
+   admin_alerts:payload.admin_alerts,
    updated_at:payload.updated_at
   })
   .eq("id",1)
@@ -2457,6 +2587,27 @@ async function dbSaveSettings(){
   throw new Error("Supabase app_settings is missing the full settings setup. Run supabase_settings_repair.sql once, then save again.");
  }
  throw res.error||new Error("Settings row id=1 was not found.");
+}
+
+async function dbSaveActivityLog(){
+ if(!supabaseClient)return false;
+ if(!onlineReady)setOnlineStatus(true,"Database connected");
+ ensureActivityLog();
+ try{
+  const {error}=await supabaseClient
+   .from("app_settings")
+   .update({
+    activity_log:(state.activityLog||[]).slice(0,ACTIVITY_LIMIT),
+    admin_alerts:Array.isArray(state.adminAlerts)?state.adminAlerts:[],
+    updated_at:new Date().toISOString()
+   })
+   .eq("id",1);
+  if(error)throw error;
+  return true;
+ }catch(e){
+  console.warn("Latest News save skipped. Run the v67 SQL repair if news does not sync.",e);
+  return false;
+ }
 }
 
 async function dbSaveTeams(){
@@ -2496,8 +2647,9 @@ async function dbUpsertPlayer(p){
  };
  const attempts=[
   stateRow,
-  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,locked:stateRow.locked,result:stateRow.result,previous:stateRow.previous,out_round:stateRow.out_round,out_pick:stateRow.out_pick},
-  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,locked:stateRow.locked,result:stateRow.result,previous:stateRow.previous}
+  {user_id:stateRow.user_id,competition_number:stateRow.competition_number,rollover_number:stateRow.rollover_number,round_number:stateRow.round_number,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,result:stateRow.result,previous:stateRow.previous,updated_at:stateRow.updated_at},
+  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,result:stateRow.result,previous:stateRow.previous},
+  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick}
  ];
  let lastError=null;
  for(const row of attempts){
@@ -2617,15 +2769,27 @@ async function dbSaveCompetitionState(){
 async function dbSyncAll(){
  if(!onlineReady)setOnlineStatus(true,"Database connected");
  const errors=[];
+
+ // Player devices must only save their own player_state row.
+ // Otherwise a stale phone can overwrite other players or old settings from localStorage.
+ if(authUser&&authUser.role!=="admin"){
+  const p=currentPlayer();
+  try{await dbUpsertPlayer(p);}catch(e){errors.push(e);}
+  if(errors.length)throw errors[0];
+  return;
+ }
+
+ // Admin devices are allowed to save all player state and competition progress.
  for(const p of state.players){
   try{await dbUpsertPlayer(p);}catch(e){errors.push(e);}
  }
- try{await dbSaveTeams();}catch(e){errors.push(e);}
  try{await dbSaveChampions();}catch(e){errors.push(e);}
  try{await dbSaveCompetitionState();}catch(e){console.warn("Competition state save skipped",e);}
- // Settings are saved explicitly from the Settings screen. Do not let an app_settings
- // policy issue block player picks, round results, paid status, or admin corrections.
- try{await dbSaveSettings();}catch(e){console.warn("Settings background save skipped",e);}
+ try{await dbSaveActivityLog();}catch(e){console.warn("Latest News save skipped",e);}
+
+ // Do NOT save full app_settings here. Settings, Teams, Rules, Disclaimer and Announcements
+ // are saved only by their dedicated admin buttons. This prevents normal player actions
+ // from overwriting admin settings with stale localStorage.
  if(errors.length)throw errors[0];
 }
 
@@ -2858,6 +3022,8 @@ async function loadAppSettingsFromSupabase(){
   if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
   if(typeof data.disclaimer!=="undefined"&&data.disclaimer!==null)state.disclaimer=data.disclaimer;
   if(data.leagues&&typeof data.leagues==="object")state.leagues=data.leagues;
+  if(Array.isArray(data.activity_log))state.activityLog=data.activity_log.slice(0,ACTIVITY_LIMIT);
+  if(Array.isArray(data.admin_alerts))state.adminAlerts=data.admin_alerts;
   if(Array.isArray(data.teams))state.teams=data.teams;
   else if(state.leagues)state.teams=Object.values(state.leagues).flat();
 
@@ -2916,13 +3082,21 @@ window.saveAnnouncementAndDisclaimer=saveAnnouncementAndDisclaimer;
 window.saveNotificationMessages=saveNotificationMessages;
 window.dismissCurrentAnnouncement=dismissCurrentAnnouncement;
 window.factoryResetKeepAdmin=factoryResetKeepAdmin;
+window.completeForcedPasswordReset=completeForcedPasswordReset;
+window.openCopyModal=openCopyModal;
+window.closeCopyModal=closeCopyModal;
+window.manualCopy=manualCopy;
+window.notifyUnpaid=notifyUnpaid;
+window.notifyMissingPicks=notifyMissingPicks;
+window.notifyWinner=notifyWinner;
+window.notifyRollover=notifyRollover;
 
 async function refreshSharedState(){
  if(!authUser)return;
  const old=JSON.stringify({
   competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
   entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
-  rules:state.rules,disclaimer:state.disclaimer,players:state.players
+  rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
  });
  await loadAppSettingsFromSupabase();
  await loadAnnouncementDismissalsForUser();
@@ -2931,7 +3105,7 @@ async function refreshSharedState(){
  const next=JSON.stringify({
   competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
   entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
-  rules:state.rules,disclaimer:state.disclaimer,players:state.players
+  rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
  });
  if(old!==next)render();
 }
