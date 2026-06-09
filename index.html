@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v68 critical save fix: saveNow actually writes player/payment/pick state to Supabase -->
+<!-- v69 player visibility and late-join waiting fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -861,9 +861,9 @@ function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]||ch));}
 function textToHtml(value){return escapeHtml(value).replace(/\n/g,"<br>");}
 function sortTextList(list){return [...new Set((list||[]).map(x=>String(x||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));}
-function paid(){return state.players.filter(p=>p.paid&&p.approved)}
-function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive)}
-function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
+function paid(){return state.players.filter(p=>p.paid&&p.approved&&!isQueuedForNextCompetition(p))}
+function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive&&!isQueuedForNextCompetition(p))}
+function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive&&!isQueuedForNextCompetition(p)).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
 function pot(){return (state.potCarryover||0)+(paid().length*state.entryFee)}
 function currentPlayer(){
  if(authUser&&authUser.user_id){
@@ -875,6 +875,38 @@ function currentPlayer(){
 function defendingChampion(){return state.champions.length?state.champions[state.champions.length-1].name:"None"}
 function stars(n){return n?"⭐".repeat(n):""}
 function displayName(p){return `${defendingChampion()===p.name?"🏆 ":""}${p.name} ${stars(p.wins)}`.trim()}
+function isQueuedForNextCompetition(p){
+ return !!(p&&p.result==="waiting_next_competition");
+}
+function competitionHasStarted(){
+ return Number(state.round||1)>1||Number(state.rollover||0)>0;
+}
+function playerHasCompetitionHistory(p){
+ if(!p)return false;
+ return !!(
+  (Array.isArray(p.previous)&&p.previous.length)||
+  p.pick||
+  p.locked||
+  Number(p.wins||0)>0||
+  p.outRound||
+  p.outPick
+ );
+}
+function shouldQueueForNextCompetition(p){
+ return !!(p&&competitionHasStarted()&&!p.adminPlayer&&!playerHasCompetitionHistory(p));
+}
+function queueForNextCompetition(p){
+ if(!p)return p;
+ p.paid=false;
+ p.alive=false;
+ p.locked=true;
+ p.pick="";
+ p.result="waiting_next_competition";
+ p.outRound=null;
+ p.outPick=null;
+ if(!Array.isArray(p.previous))p.previous=[];
+ return p;
+}
 function ensureLeagues(){
  if(!state.leagues){
   state.leagues={"Premier League":[...state.teams],"Championship":[],"League One":[],"League Two":[]};
@@ -912,7 +944,7 @@ async function syncUsersFromSupabase(){
   const usersRes=await supabaseClient
    .from("app_users")
    .select("id,username,display_name,role,approved,notifications_enabled")
-   .eq("role","player")
+   .in("role",["player","admin"])
    .order("display_name",{ascending:true});
 
   if(usersRes.error)throw usersRes.error;
@@ -969,7 +1001,9 @@ async function syncUsersFromSupabase(){
     id:u.id,
     username:u.username,
     name:u.display_name||u.username,
-    approved:!!u.approved,
+    role:u.role||"player",
+    adminPlayer:u.role==="admin",
+    approved:u.role==="admin"?true:!!u.approved,
     paid:false,
     alive:true,
     wins:0,
@@ -992,7 +1026,9 @@ async function syncUsersFromSupabase(){
     id:u.id,
     username:u.username||target.username||target.name,
     name:u.display_name||u.username||target.name,
-    approved:!!u.approved,
+    role:u.role||target.role||"player",
+    adminPlayer:u.role==="admin"||target.adminPlayer===true,
+    approved:u.role==="admin"?true:!!u.approved,
     // If a player_state row exists, trust Supabase exactly, including false, blank and null.
     // This fixes admin unlocks, round processing and cleared picks reappearing from localStorage.
     paid:hasPlayerState?(ps.paid===true):!!target.paid,
@@ -1019,6 +1055,11 @@ async function syncUsersFromSupabase(){
      changed=true;
     }
    });
+
+   if(shouldQueueForNextCompetition(target)){
+    queueForNextCompetition(target);
+    changed=true;
+   }
   });
 
   if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
@@ -1625,6 +1666,7 @@ function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
+ if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
  return `${announcementCard}<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
@@ -2094,8 +2136,14 @@ async function approvePlayer(i){
    if(error)throw error;
   }
   p.approved=true;
-  if(typeof addActivity==="function")addActivity("player",p.name+" approved","New player approved");
-  toast(p.name+" approved.");
+  if(shouldQueueForNextCompetition(p)){
+   queueForNextCompetition(p);
+   if(typeof addActivity==="function")addActivity("player",p.name+" approved for next competition","Joined after current competition started");
+   toast(p.name+" approved. They will join from the next competition.");
+  }else{
+   if(typeof addActivity==="function")addActivity("player",p.name+" approved","New player approved");
+   toast(p.name+" approved.");
+  }
   await saveNow();
  }catch(e){
   console.error(e);
@@ -2111,9 +2159,15 @@ async function approveAndPay(i){
    if(error)throw error;
   }
   p.approved=true;
-  p.paid=true;
-  if(typeof addActivity==="function")addActivity("player",p.name+" approved and paid","Player approved and marked paid");
-  toast(p.name+" approved and marked paid.");
+  if(shouldQueueForNextCompetition(p)){
+   queueForNextCompetition(p);
+   if(typeof addActivity==="function")addActivity("player",p.name+" approved for next competition","Joined after current competition started");
+   toast(p.name+" approved, but this competition has already started. They will join from the next competition.");
+  }else{
+   p.paid=true;
+   if(typeof addActivity==="function")addActivity("player",p.name+" approved and paid","Player approved and marked paid");
+   toast(p.name+" approved and marked paid.");
+  }
   await saveNow();
  }catch(e){
   console.error(e);
@@ -2145,6 +2199,13 @@ async function rejectPlayer(i){
 async function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
+ if(!p.paid&&shouldQueueForNextCompetition(p)){
+  queueForNextCompetition(p);
+  addActivity("player",p.name+" queued for next competition","Payment blocked because current competition has already started");
+  toast(p.name+" joined after the competition started. They are queued for the next competition and cannot pick this one.");
+  await saveNow();
+  return;
+ }
  p.paid=!p.paid;
  addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status updated");
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
@@ -2153,6 +2214,7 @@ async function togglePaid(i){
 async function toggleAlive(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
+ if(isQueuedForNextCompetition(p)&&competitionHasStarted())return toast(p.name+" is queued for the next competition and cannot be made active in this one.");
  p.alive=!p.alive;
  if(p.alive){
   p.outRound=null;
@@ -2248,6 +2310,9 @@ function chooseTempPick(v){window.tempPick=v;render()}
 async function confirmPlayerPick(){
  const p=currentPlayer();
  const pick=(window.tempPick||"").trim();
+ if(isQueuedForNextCompetition(p))return toast("You cannot pick until the next competition starts.");
+ if(!p.alive)return toast("You are not active in the current competition.");
+ if(!p.paid)return toast("You cannot submit a pick until your payment has been marked as paid.");
  if(!pick){
   p.locked=false;
   return toast("Choose a team first.");
@@ -2326,7 +2391,7 @@ async function processRound(){
   state.potCarryover=(state.potCarryover||0)+(paid().length*state.entryFee);
   state.rollover=(state.rollover||0)+1;
   state.round++;
-  state.players.filter(p=>p.approved).forEach(p=>{
+  state.players.filter(p=>p.approved&&!isQueuedForNextCompetition(p)).forEach(p=>{
    p.alive=true;
    p.paid=false;
    p.outRound=null;
