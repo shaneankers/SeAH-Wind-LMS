@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v66 audit fixes: safer sync, working admin notification buttons, forced password reset and copy modal helpers -->
+<!-- v68 critical save fix: saveNow actually writes player/payment/pick state to Supabase -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -2253,12 +2253,21 @@ async function confirmPlayerPick(){
   return toast("Choose a team first.");
  }
  if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
+ const oldPick=p.pick;
+ const oldLocked=p.locked;
  p.pick=pick;
  p.locked=true;
  addActivity("pick",p.name+" picked "+pick,"Round "+state.round+" pick submitted");
  window.tempPick="";
- toast("Pick submitted and locked.");
- await saveNow();
+ try{
+  await saveNow();
+  toast("Pick submitted and locked.");
+ }catch(e){
+  p.pick=oldPick;
+  p.locked=oldLocked;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+ }
 }
 async function processRound(){
  const pending=alive().filter(p=>p.result==="pending");
@@ -2811,9 +2820,42 @@ save=function(){
  return __saveQueue;
 };
 async function saveNow(){
- const p=save();
- try{await p;}catch(e){}
- return p;
+ // v68 critical fix:
+ // The old saveNow called save(), but save() only writes to localStorage and returns undefined.
+ // That meant admin "Paid" changes and player picks looked saved on one device but never reached Supabase.
+ localStorage.setItem(storeKey,JSON.stringify(state));
+
+ try{
+  if(supabaseClient){
+   if(!onlineReady)setOnlineStatus(true,"Database connected");
+
+   // Admin actions may change many players at once, so save every player row.
+   if(authUser&&authUser.role==="admin"){
+    const playersToSave=(state.players||[]).filter(p=>p&&p.id);
+    for(const p of playersToSave){
+     await dbUpsertPlayer(p);
+    }
+
+    // Admin round/competition changes also need to reach app_settings so all devices sync.
+    try{
+     await dbSaveSettings();
+    }catch(settingsErr){
+     console.warn("Settings save skipped/failed during saveNow",settingsErr);
+    }
+   }else{
+    // Player actions only save that player's state. Do not let a player phone overwrite settings.
+    const p=currentPlayer();
+    if(p&&p.id)await dbUpsertPlayer(p);
+   }
+  }
+ }catch(e){
+  console.error("Database save failed",e);
+  toast("Database save failed: "+(e.message||"unknown error"));
+  throw e;
+ }
+
+ render();
+ return true;
 }
 
 async function loginUser(){
