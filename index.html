@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v69 player visibility and late-join waiting fix -->
+<!-- v71 merged fix: shared Latest News RPC, admin/player visibility, safer notifications, mobile news layout -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -796,6 +796,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   max-width:760px!important;
 }
 
+
+/* v71 mobile Latest News layout fix */
+@media(max-width:560px){
+ .activity-row{display:block!important;padding:12px 0!important;}
+ .activity-left{align-items:flex-start!important;min-width:0!important;}
+ .activity-left>div:last-child{min-width:0!important;width:100%!important;}
+ .activity-main{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.25!important;}
+ .activity-sub{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.35!important;margin-top:3px!important;}
+ .activity-time{display:block!important;white-space:normal!important;margin-left:48px!important;margin-top:5px!important;font-size:11px!important;}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1525,15 +1536,20 @@ async function notifyGroup(type,targets,message){
  if(!targets.length)return toast("No matching players to notify.");
 
  const recipientNames=targets.map(p=>p.name).join(", ");
- const fullMessage=`${message}\n\nRecipients: ${recipientNames}`;
+ const fullMessage=`${message}
 
- // Try the Supabase Edge Function if it exists. If it is not deployed or rejects the
- // payload, still give the admin a copyable message instead of a broken button.
+Recipients: ${recipientNames}`;
+
  let pushed=false;
+ let pushError="";
  try{
   const res=await fetch(PUSH_FUNCTION_URL,{
    method:"POST",
-   headers:{"Content-Type":"application/json"},
+   headers:{
+    "Content-Type":"application/json",
+    "apikey":SUPABASE_PUBLISHABLE_KEY,
+    "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
+   },
    body:JSON.stringify({
     type,
     user_ids:targets.map(p=>p.id).filter(Boolean),
@@ -1542,14 +1558,24 @@ async function notifyGroup(type,targets,message){
    })
   });
   pushed=res.ok;
+  if(!res.ok){
+   try{pushError=await res.text();}catch(e){pushError=res.status+" "+res.statusText;}
+   console.warn("Push notification send was not confirmed",res.status,pushError);
+  }
  }catch(e){
-  console.warn("Push notification send skipped",e);
+  pushError=e.message||"network/function error";
+  console.warn("Push notification send failed",e);
  }
 
  addActivity("notify",(pushed?"Sent ":"Prepared ")+type+" notification",targets.length+" recipient"+(targets.length===1?"":"s"));
- localStorage.setItem(storeKey,JSON.stringify(state));
- openCopyModal(fullMessage);
- toast(pushed?"Notification sent. Message also ready to copy.":"Message ready to copy. Push send was not confirmed.");
+ await dbSaveActivityLog();
+
+ if(pushed){
+  toast("Notification sent.");
+ }else{
+  openCopyModal(fullMessage);
+  toast("Push was not confirmed, so the message is ready to copy.");
+ }
  render();
 }
 
