@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v75 notification template + account push registration fix -->
+<!-- v76 notification settings + account push registration verified fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1569,13 +1569,11 @@ async function notifyGroup(type,targets,message){
  try{message=await notificationMessageFromSettings(type);}
  catch(e){console.error(e);return toast(e.message||"Notification message missing from Settings.");}
 
+ const userIds=targets.map(p=>p.id).filter(Boolean);
  const recipientNames=targets.map(p=>p.name).join(", ");
- const fullMessage=`${message}
-
-Recipients: ${recipientNames}`;
-
  let pushed=false;
  let pushError="";
+ let pushDetail="";
  try{
   const res=await fetch(PUSH_FUNCTION_URL,{
    method:"POST",
@@ -1586,14 +1584,17 @@ Recipients: ${recipientNames}`;
    },
    body:JSON.stringify({
     type:notificationTemplateKey(type),
-    user_ids:targets.map(p=>p.id).filter(Boolean),
+    user_ids:userIds,
     title:notificationTitle(type),
     message:message
    })
   });
-  pushed=res.ok;
-  if(!res.ok){
-   try{pushError=await res.text();}catch(e){pushError=res.status+" "+res.statusText;}
+  let json=null;
+  try{json=await res.json();}catch(e){json=null;}
+  pushed=!!(res.ok&&json&&json.success!==false&&Number(json.sent||0)>0);
+  pushDetail=json?JSON.stringify(json):res.status+" "+res.statusText;
+  if(!pushed){
+   pushError=pushDetail;
    console.warn("Push notification send was not confirmed",res.status,pushError);
   }
  }catch(e){
@@ -1605,10 +1606,10 @@ Recipients: ${recipientNames}`;
  await dbSaveActivityLog();
 
  if(pushed){
-  toast("Notification sent.");
+  toast("Notification sent from Settings message.");
  }else{
   toast("Push notification failed/not confirmed. Check player device notification registration.");
-  addAdminAlert("Push notification failed",(pushError||"No confirmed push delivery")+". Ask players to open the app once so the device can register for notifications.");
+  addAdminAlert("Push notification failed",(pushError||"No confirmed push delivery")+". Recipients: "+recipientNames+". Open the app once on each player device so notifications can register.");
   await dbSaveActivityLog();
  }
  render();
@@ -1928,12 +1929,18 @@ function urlBase64ToUint8Array(base64String){
 }
 
 async function preAskNotificationPermission(){
- // Ask at the moment the player clicks Create Account/Login, before long async work.
- // Some mobile browsers only allow the permission prompt while still inside a user action.
- if(!("Notification" in window))return false;
- if(Notification.permission!=="default")return Notification.permission==="granted";
- const ok=window.confirm("Please keep notifications turned on for the best experience. This lets you receive pick reminders and competition updates.");
- if(!ok)return false;
+ // Ask during the Create Account/Login button click. Browsers only allow the
+ // native permission prompt while the user is actively interacting with the page.
+ if(!("Notification" in window)){
+  toast("This browser does not support push notifications.");
+  return false;
+ }
+ if(Notification.permission==="granted")return true;
+ if(Notification.permission==="denied"){
+  alert("Notifications are blocked for this site on this device. To receive reminders, open your browser/site settings and allow notifications for SeAH Wind LMS.");
+  return false;
+ }
+ alert("Please keep notifications turned on for the best experience. You will receive pick reminders and competition updates.");
  try{
   const permission=await Notification.requestPermission();
   if(permission==="granted"){
@@ -1959,7 +1966,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=59-verified-rules-settings");
+ const registration=await navigator.serviceWorker.register("sw.js?v=76-notification-registration");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -2007,6 +2014,33 @@ async function ensurePushRegistered(canPrompt){
   return true;
  }catch(e){
   console.warn("Automatic push registration failed",e);
+  return false;
+ }
+}
+
+async function forceEnableNotificationsForLoggedInUser(){
+ if(!authUser||!authUser.user_id||!supabaseClient)return false;
+ authUser.notifications_enabled=true;
+ localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ const p=state.players.find(x=>x.id===authUser.user_id);
+ if(p)p.notifications=true;
+ try{
+  const direct=await supabaseClient
+   .from("app_users")
+   .update({notifications_enabled:true})
+   .eq("id",authUser.user_id);
+  if(!direct.error)return true;
+  console.warn("Direct notification enable failed",direct.error);
+ }catch(e){console.warn("Direct notification enable failed",e);}
+ try{
+  const rpc=await supabaseClient.rpc("app_set_notifications_by_username",{
+   p_username:authUser.username||authUser.name,
+   p_enabled:true
+  });
+  if(rpc.error)throw rpc.error;
+  return true;
+ }catch(e){
+  console.warn("Notification enable RPC failed",e);
   return false;
  }
 }
@@ -3206,18 +3240,10 @@ async function createAccount(){
   };
   currentUserId=u.user_id;
 
-  // New accounts should start with notifications enabled in the database.
-  // The browser permission prompt still depends on the device/browser, but the
-  // user should not need to toggle the app setting off and on to register.
-  try{
-   const noteRes=await supabaseClient.rpc("app_set_notifications_by_username",{
-    p_username:u.username||name,
-    p_enabled:true
-   });
-   if(noteRes.error)console.warn("Could not set notifications enabled for new account",noteRes.error);
-  }catch(e){console.warn("Could not set notifications enabled for new account",e);}
-
+  // New accounts start with notifications enabled in the app database.
+  // Device/browser permission is handled separately by the native prompt.
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  await forceEnableNotificationsForLoggedInUser();
 
   await loadAppSettingsFromSupabase();
   await loadAnnouncementDismissalsForUser();
@@ -3249,6 +3275,10 @@ async function createAccount(){
 
   state.selectedPlayer=u.display_name||u.username||name;
   page="myPick";
+  const createdPlayer=state.players.find(x=>x.id===authUser.user_id);
+  if(createdPlayer)createdPlayer.notifications=true;
+  authUser.notifications_enabled=true;
+  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   localStorage.setItem(storeKey,JSON.stringify(state));
   await ensurePushRegistered(true);
   render();
