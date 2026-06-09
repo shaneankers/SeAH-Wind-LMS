@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v59 verified rules and settings restoration -->
+<!-- v41 join code RPC fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -838,7 +838,7 @@ const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
 const storeKey="seah_wind_lms_live_supabase_v27";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
- competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
+ competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
  notifications:{
   unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",
@@ -858,9 +858,6 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
 let authUser=JSON.parse(localStorage.getItem("seah_auth_user_current")||"null"),loginMode="login",role="admin",page="dashboard",adminView=localStorage.getItem("seah_admin_view_current")||"admin";
 function save(){localStorage.setItem(storeKey,JSON.stringify(state));render()}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
-function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]||ch));}
-function textToHtml(value){return escapeHtml(value).replace(/\n/g,"<br>");}
-function sortTextList(list){return [...new Set((list||[]).map(x=>String(x||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));}
 function paid(){return state.players.filter(p=>p.paid&&p.approved)}
 function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive)}
 function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
@@ -879,12 +876,7 @@ function ensureLeagues(){
  if(!state.leagues){
   state.leagues={"Premier League":[...state.teams],"Championship":[],"League One":[],"League Two":[]};
  }
- Object.keys(state.leagues).forEach(league=>{
-  state.leagues[league]=[...new Set((state.leagues[league]||[]).filter(Boolean))]
-   .sort((a,b)=>String(a).localeCompare(String(b),undefined,{sensitivity:"base"}));
- });
- state.teams=Object.values(state.leagues).flat()
-  .sort((a,b)=>String(a).localeCompare(String(b),undefined,{sensitivity:"base"}));
+ state.teams=Object.values(state.leagues).flat();
 }
 function leagueKeys(){ensureLeagues();return Object.keys(state.leagues);}
 function teamLeague(team){
@@ -903,94 +895,75 @@ function noteText(key, extra={}){
  return (state.notifications[key]||"").replace(/\{(\w+)\}/g,(m,k)=>data[k]??m);
 }
 
-function announcementTextVersionFallback(){
- const text=(state.announcement||"").trim();
- if(!text)return 0;
- let hash=0;
- for(let i=0;i<text.length;i++){hash=((hash*31)+text.charCodeAt(i))>>>0;}
- return hash||1;
-}
-function currentAnnouncementVersion(){
- const dbVersion=Number(state.announcementVersion||0)||0;
- return dbVersion||announcementTextVersionFallback();
-}
-function announcementDismissLocalKey(){
- const id=(authUser&&authUser.user_id)||"guest";
- return "seah_dismissed_announcements_"+id;
-}
-function getDismissedAnnouncementVersions(){
- if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
- const id=(authUser&&authUser.user_id)||"guest";
- if(!Array.isArray(state.dismissedAnnouncementVersions[id])){
-  try{state.dismissedAnnouncementVersions[id]=JSON.parse(localStorage.getItem(announcementDismissLocalKey())||"[]");}
-  catch(e){state.dismissedAnnouncementVersions[id]=[];}
- }
- return state.dismissedAnnouncementVersions[id];
-}
-function hasDismissedCurrentAnnouncement(){
- const text=(state.announcement||"").trim();
- const version=currentAnnouncementVersion();
- if(!text||!version)return false;
- return getDismissedAnnouncementVersions().includes(version);
-}
-async function loadAnnouncementDismissalsForUser(){
- if(!authUser||!authUser.user_id||!supabaseClient)return false;
- const id=authUser.user_id;
+async function syncUsersFromSupabase(){
  try{
-  let versions=[];
-  let direct=await supabaseClient
-   .from("player_announcement_dismissals")
-   .select("announcement_version")
-   .eq("player_id",id);
+  if(!onlineReady)return false;
+  const {data,error}=await supabaseClient
+   .from("app_users")
+   .select("id,username,display_name,role,approved,notifications_enabled")
+   .eq("role","player")
+   .order("display_name",{ascending:true});
+  if(error)throw error;
+  if(!Array.isArray(data))return false;
 
-  if(direct.error){
-   // Backwards compatibility only, in case an older test table used user_id.
-   direct=await supabaseClient
-    .from("player_announcement_dismissals")
-    .select("announcement_version")
-    .eq("user_id",id);
-  }
+  let changed=false;
 
-  if(direct.error)throw direct.error;
-  versions=(direct.data||[]).map(x=>Number(x.announcement_version)).filter(Boolean);
+  data.forEach(u=>{
+   let p=state.players.find(x=>x.id===u.id);
+   if(!p)p=state.players.find(x=>(x.username||"").toLowerCase()===(u.username||"").toLowerCase());
 
-  if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
-  state.dismissedAnnouncementVersions[id]=[...new Set(versions)];
-  localStorage.setItem(announcementDismissLocalKey(),JSON.stringify(state.dismissedAnnouncementVersions[id]));
-  localStorage.setItem(storeKey,JSON.stringify(state));
-  return true;
+   if(!p){
+    state.players.push({
+     id:u.id,
+     username:u.username,
+     name:u.display_name||u.username,
+     approved:!!u.approved,
+     paid:false,
+     alive:true,
+     wins:0,
+     pick:"",
+     locked:false,
+     result:"pending",
+     previous:[],
+     outRound:null,
+     outPick:null,
+     notifications:u.notifications_enabled!==false
+    });
+    changed=true;
+   }else{
+    const newName=u.display_name||p.name||u.username;
+    const newApproved=!!u.approved;
+    if(p.id!==u.id){p.id=u.id;changed=true;}
+    if(p.username!==u.username){p.username=u.username;changed=true;}
+    if(p.name!==newName){p.name=newName;changed=true;}
+    if(p.approved!==newApproved){p.approved=newApproved;changed=true;}
+    if(typeof p.paid==="undefined"){p.paid=false;changed=true;}
+    if(typeof p.alive==="undefined"){p.alive=true;changed=true;}
+    if(typeof p.wins==="undefined"){p.wins=0;changed=true;}
+    if(typeof p.pick==="undefined"){p.pick="";changed=true;}
+    if(typeof p.locked==="undefined"){p.locked=false;changed=true;}
+    if(typeof p.result==="undefined"){p.result="pending";changed=true;}
+    if(!Array.isArray(p.previous)){p.previous=[];changed=true;}
+    if(typeof p.notifications==="undefined"){p.notifications=u.notifications_enabled!==false;changed=true;}
+   }
+  });
+
+  if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
+  return changed;
  }catch(e){
-  console.warn("Could not load announcement dismissals",e);
+  console.warn("Could not sync users from Supabase",e);
   return false;
  }
 }
-async function dismissCurrentAnnouncement(){
- const text=(state.announcement||"").trim();
- const version=currentAnnouncementVersion();
- if(!text)return toast("No announcement to dismiss.");
- const safeVersion=version||announcementTextVersionFallback()||Date.now();
- const versions=getDismissedAnnouncementVersions();
- if(!versions.includes(safeVersion))versions.push(safeVersion);
- const id=(authUser&&authUser.user_id)||"guest";
- if(!state.dismissedAnnouncementVersions)state.dismissedAnnouncementVersions={};
- state.dismissedAnnouncementVersions[id]=versions;
- localStorage.setItem(announcementDismissLocalKey(),JSON.stringify(versions));
- localStorage.setItem(storeKey,JSON.stringify(state));
- render();
- try{
-  if(authUser&&authUser.user_id&&supabaseClient){
-   const direct=await supabaseClient.from("player_announcement_dismissals").upsert({
-    player_id:authUser.user_id,
-    announcement_version:safeVersion,
-    dismissed_at:new Date().toISOString()
-   },{onConflict:"player_id,announcement_version"});
-   if(direct.error)throw direct.error;
-  }
- }catch(e){
-  console.warn("Could not save announcement dismissal to Supabase",e);
-  toast("Dismissed on this device, but database save failed.");
- }
+
+async function syncUsersAndRender(){
+ if(window.__syncingUsers)return;
+ window.__syncingUsers=true;
+ const changed=await syncUsersFromSupabase();
+ window.__syncingUsers=false;
+ if(changed)render();
 }
+
 function renderAuth(){
  const login=document.getElementById("loginScreen"),app=document.getElementById("appScreen");
  if(authUser&&authUser.must_reset_password){
@@ -1010,7 +983,7 @@ function renderAuth(){
   return true
  }
  app.style.display="none";login.style.display="block";
- login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" placeholder="Enter username"><label style="margin-top:12px">Password</label><input id="loginPin" type="password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" placeholder="Choose username"><label style="margin-top:12px">Password</label><input id="createPin" type="password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${loginMode==='login'?`<label>Username</label><input id="loginName" placeholder="Enter username"><label style="margin-top:12px">Password</label><input id="loginPin" type="password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" placeholder="Choose username"><label style="margin-top:12px">Password</label><input id="createPin" type="password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
 async function saveAdminAccount(){
@@ -1140,27 +1113,7 @@ function render(){
   if(p.locked && !p.pick) p.locked=false;
   if(typeof p.notifications==="undefined") p.notifications=true;
  });
- if(!renderAuth())return;
- const items=navItems();
- const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";
- document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;
- document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰]/g,"").trim();
- document.getElementById("pageSub").textContent="";
- document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;
- document.getElementById("sideSub").textContent="";
- document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");
- document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");
- const views={dashboard:dashboard,players:players,round:round,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
- const view=views[page]||dashboard;
- const content=document.getElementById("content");
- try{
-  content.innerHTML=view();
- }catch(e){
-  console.error("Render failed for page",page,e);
-  content.innerHTML=`<div class="notice">Could not load this page. Please refresh. ${escapeHtml(e.message||"")}</div>`;
- }
-}
-
+ if(!renderAuth())return;const items=navItems();const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅]/g,"").trim();document.getElementById("pageSub").textContent="";document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;document.getElementById("sideSub").textContent="";document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");const views={dashboard,players,round,settings,myPick,latestNews,previous,competition,playerHall,rules,playerSettings};document.getElementById("content").innerHTML=(views[page]||dashboard)()}
 function setPage(p){
  page=p;
  render();
@@ -1387,8 +1340,7 @@ function round(){
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
- const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
- return `${announcementCard}<div class="player-top">
+ return `<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
    <h2>Round ${state.round}</h2>
@@ -1412,7 +1364,7 @@ function myPick(){
   ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
   <div class="pick-grid">
    <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
+   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${state.leagues[window.tempLeague||teamLeague(selected)].map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
   </div>
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
@@ -1462,23 +1414,7 @@ function playerHall(){
  return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
 }
 
-function rules(){
- const rulesHtml=textToHtml(state.rules||"");
- const disclaimerHtml=(state.disclaimer||"").trim()?`<div class="card"><div class="card-head"><strong>Disclaimer</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.disclaimer)}</div></div></div>`:"";
- return `<div class="card">
-  <div class="card-head"><strong>Competition Info</strong></div>
-  <div class="card-body list">
-   <div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div>
-   <div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div>
-  </div>
- </div>
- <div class="card">
-  <div class="card-head"><strong>Rules</strong></div>
-  <div class="card-body"><div style="line-height:1.6;white-space:pre-wrap">${rulesHtml}</div></div>
- </div>
- ${disclaimerHtml}`;
-}
-
+function rules(){return `<div class="card"><div class="card-head"><strong>Competition Info</strong></div><div class="card-body list"><div class="item"><div class="item-title">Entry Fee</div><span class="badge yellow">£${state.entryFee}</span></div><div class="item"><div class="item-title">Pick Deadline</div><span class="badge orange">${state.deadline}</span></div></div></div><div class="card"><div class="card-head"><strong>Rules</strong></div><div class="card-body"><div style="line-height:1.6;white-space:pre-wrap">${textToHtml(state.rules||"")}</div></div></div>`}
 function playerSettings(){
  const p=currentPlayer();
  const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
@@ -1523,7 +1459,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=59-verified-rules-settings");
+ const registration=await navigator.serviceWorker.register("sw.js?v=27");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -1674,100 +1610,59 @@ function copyInvite(){
  }
 }
 
-function settings(){
- ensureLeagues();
- const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";
- return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body">
-  <label>Username</label><input id="adminUsername" value="${escapeHtml(adminUsername)}">
-  <label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value="">
-  <br><br><button onclick="saveAdminAccount()">Save Admin Login</button>
- </div></div>
+function settings(){ensureLeagues();const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body"><label>Username</label><input id="adminUsername" value="${adminUsername}"><label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value=""><br><br><button onclick="saveAdminAccount()">Save Admin Login</button></div></div>
 
- <div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body">
-  <div class="item"><div><div class="item-title">${escapeHtml(state.joinCode||"")}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div>
-  <br><button onclick="copyInvite()">Copy Invite Message</button>
- </div></div>
+<div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body"><div class="item"><div><div class="item-title">${state.joinCode}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div><br><button onclick="copyInvite()">Copy Invite Message</button></div></div>
 
- <div class="card"><div class="card-head"><strong>Competition Rules</strong><span class="badge orange">v59 verified</span></div><div class="card-body">
-  <div class="formrow">
-   <div><label>Entry fee</label><input id="entryFee" type="number" value="${escapeHtml(state.entryFee)}"></div>
-   <div><label>Deadline</label><input id="deadline" value="${escapeHtml(state.deadline||"")}"></div>
-  </div>
-  <label>Rules</label><textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
-  <br><br><button onclick="saveSettings()">Save Rules</button>
- </div></div>
+<div class="card"><div class="card-head"><strong>Competition</strong></div><div class="card-body"><div class="formrow"><div><label>Entry fee</label><input id="entryFee" type="number" value="${state.entryFee}"></div><div><label>Deadline</label><input id="deadline" value="${state.deadline}"></div></div><label>Rules</label><textarea id="rulesText" rows="5">${state.rules}</textarea><br><br><button onclick="saveSettings()">Save</button></div></div>
 
- <div class="card"><div class="card-head"><strong>Announcements & Disclaimer</strong></div><div class="card-body notification-editor">
-  <div><label>Player dashboard announcement</label><textarea id="announcementText" rows="4" placeholder="Example: Competition delayed until next weekend.">${escapeHtml(state.announcement||"")}</textarea><div class="tiny">Shown above the player dashboard round card. When this text changes, players will see it again even if they dismissed the previous one.</div></div>
-  <div><label>Disclaimer</label><textarea id="disclaimerText" rows="5">${escapeHtml(state.disclaimer||"")}</textarea><div class="tiny">Shown on the login page and the player Rules page.</div></div>
-  <button onclick="saveAnnouncementAndDisclaimer()">Save Announcement & Disclaimer</button>
- </div></div>
-
- <div class="card"><div class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
-  <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${escapeHtml(noteTextRaw('unpaid'))}</textarea></div>
-  <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${escapeHtml(noteTextRaw('missingPick'))}</textarea></div>
-  <div><label>Winner announcement</label><textarea id="noteWinner" rows="3">${escapeHtml(noteTextRaw('winner'))}</textarea></div>
-  <div><label>Rollover announcement</label><textarea id="noteRollover" rows="3">${escapeHtml(noteTextRaw('rollover'))}</textarea></div>
+<div class="card"><div class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
+  <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${noteTextRaw('unpaid')}</textarea></div>
+  <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${noteTextRaw('missingPick')}</textarea></div>
+  <div><label>Winner announcement</label><textarea id="noteWinner" rows="3">${noteTextRaw('winner')}</textarea></div>
+  <div><label>Rollover announcement</label><textarea id="noteRollover" rows="3">${noteTextRaw('rollover')}</textarea></div>
   <button onclick="saveNotificationMessages()">Save Notification Messages</button>
   <button class="ghost" onclick="togglePlaceholders()">ⓘ Available placeholders</button>
   <div id="placeholderBox" class="placeholder-box notice">{entryFee}, {round}, {deadline}, {competition}, {winner}</div>
- </div></div>
+</div></div>
 
- <div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
+<div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
   ${leagueKeys().map(league=>`<div class="league-box">
-   <div class="league-head"><strong>${escapeHtml(league)}</strong><span class="badge">${state.leagues[league].length}</span></div>
-   <div class="team-chip-list">
-    ${sortTextList(state.leagues[league]).map(team=>`<span class="team-chip">${escapeHtml(team)}<button onclick="removeTeam('${league.replace(/'/g,"\\'")}','${team.replace(/'/g,"\\'")}')">×</button></span>`).join("") || `<div class="tiny">No teams added yet.</div>`}
-   </div>
-   <div class="add-team-row"><input id="add-${league.replace(/\s/g,'-')}" placeholder="Add team to ${escapeHtml(league)}"><button class="small" onclick="addTeam('${league.replace(/'/g,"\\'")}')">Add</button></div>
+    <div class="league-head"><strong>${league}</strong><span class="badge">${state.leagues[league].length}</span></div>
+    <div class="team-chip-list">
+      ${state.leagues[league].map(team=>`<span class="team-chip">${team}<button onclick="removeTeam('${league.replace(/'/g,"\\'")}','${team.replace(/'/g,"\\'")}')">×</button></span>`).join("") || `<div class="tiny">No teams added yet.</div>`}
+    </div>
+    <div class="add-team-row"><input id="add-${league.replace(/\s/g,'-')}" placeholder="Add team to ${league}"><button class="small" onclick="addTeam('${league.replace(/'/g,"\\'")}')">Add</button></div>
   </div>`).join("")}
- </div></div>
+</div></div>
 
- <div class="card factory-reset-card"><div class="card-head"><strong>Factory Reset</strong></div><div class="card-body">
+<div class="card factory-reset-card"><div class="card-head"><strong>Factory Reset</strong></div><div class="card-body">
   <div class="factory-reset-desc">Deletes all players, picks, payments, activity logs and competition history. The administrator account and settings will be kept.</div>
   <button class="red" onclick="factoryResetKeepAdmin()">Factory Reset (Keep Admin)</button>
- </div></div>`;
-}
-
+</div></div>`}
 function togglePlaceholders(){
  const el=document.getElementById("placeholderBox");
  if(el) el.classList.toggle("open");
 }
-async function addTeam(league){
+function addTeam(league){
  ensureLeagues();
  const input=document.getElementById("add-"+league.replace(/\s/g,'-'));
  const name=(input?.value||"").trim();
  if(!name)return toast("Enter a team name.");
  if(state.teams.some(t=>t.toLowerCase()===name.toLowerCase()))return toast("Team already exists.");
  state.leagues[league].push(name);
- ensureLeagues();
+ state.teams=Object.values(state.leagues).flat();
  input.value="";
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving team...");
- try{
-  await dbSaveSettings();
-  toast(name+" added and saved.");
- }catch(e){
-  console.error("Team save failed",e);
-  toast("Team added on this device, but database save failed: "+(e.message||"check Supabase"));
- }
- render();
+ toast(name+" added.");
+ save();
 }
-async function removeTeam(league,team){
+function removeTeam(league,team){
  ensureLeagues();
  if(!confirm("Remove "+team+"?"))return;
  state.leagues[league]=state.leagues[league].filter(t=>t!==team);
- ensureLeagues();
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving team list...");
- try{
-  await dbSaveSettings();
-  toast(team+" removed and saved.");
- }catch(e){
-  console.error("Team remove save failed",e);
-  toast("Team removed on this device, but database save failed: "+(e.message||"check Supabase"));
- }
- render();
+ state.teams=Object.values(state.leagues).flat();
+ toast(team+" removed.");
+ save();
 }
 function selectPickLeague(v){
  window.tempLeague=v;
@@ -2076,28 +1971,31 @@ async function factoryResetKeepAdmin(){
   const adminId=authUser.user_id;
   const playerIds=state.players.filter(p=>p.id&&p.id!==adminId&&!p.adminPlayer).map(p=>p.id);
 
-  if(!onlineReady)setOnlineStatus(true,"Database connected");
   if(onlineReady){
-   // Deliberately do NOT call the Supabase factory_reset_keep_admin RPC here.
-   // The app cannot see what that SQL function deletes, so using explicit table targets is safer.
-   // This reset clears player/account competition data only and leaves app_settings alone,
-   // which protects Rules, Notification Messages, Join Code, Teams and Admin Login settings.
-   let res;
-   if(playerIds.length){
-    res=await supabaseClient.from("push_subscriptions").delete().in("user_id",playerIds); if(res.error)throw res.error;
-    res=await supabaseClient.from("pick_history").delete().in("user_id",playerIds); if(res.error)throw res.error;
-    res=await supabaseClient.from("player_state").delete().in("user_id",playerIds); if(res.error)throw res.error;
-    res=await supabaseClient.from("app_users").delete().in("id",playerIds); if(res.error)throw res.error;
+   // Prefer secure Supabase-side reset if installed. This avoids RLS problems and clears Hall of Fame properly.
+   const rpcReset=await supabaseClient.rpc("factory_reset_keep_admin",{p_admin_id:adminId});
+   if(rpcReset.error && !String(rpcReset.error.message||"").toLowerCase().includes("could not find the function")){
+    throw rpcReset.error;
    }
-   res=await supabaseClient.from("champions").delete().gte("competition_number",0); if(res.error)throw res.error;
-   if(state.activeCompetitionId){
-    res=await supabaseClient.from("competitions").update({
-     competition_number:1,
-     rollover_number:0,
-     round_number:1,
-     pot_carryover:0,
-     status:"active"
-    }).eq("id",state.activeCompetitionId); if(res.error)throw res.error;
+   if(rpcReset.error){
+    // Fallback for projects that do not have the RPC installed yet. Every error is now checked.
+    let res;
+    if(playerIds.length){
+     res=await supabaseClient.from("push_subscriptions").delete().in("user_id",playerIds); if(res.error)throw res.error;
+     res=await supabaseClient.from("pick_history").delete().in("user_id",playerIds); if(res.error)throw res.error;
+     res=await supabaseClient.from("player_state").delete().in("user_id",playerIds); if(res.error)throw res.error;
+     res=await supabaseClient.from("app_users").delete().in("id",playerIds); if(res.error)throw res.error;
+    }
+    res=await supabaseClient.from("champions").delete().gte("competition_number",0); if(res.error)throw res.error;
+    if(state.activeCompetitionId){
+     res=await supabaseClient.from("competitions").update({
+      competition_number:1,
+      rollover_number:0,
+      round_number:1,
+      pot_carryover:0,
+      status:"active"
+     }).eq("id",state.activeCompetitionId); if(res.error)throw res.error;
+    }
    }
   }
 
@@ -2134,203 +2032,8 @@ async function factoryResetKeepAdmin(){
  }
 }
 
-
-/* ===== Missing settings/database helpers restored ===== */
-function normaliseNumber(value,fallback){
- const n=Number(value);
- return Number.isFinite(n)?n:fallback;
-}
-
-async function saveSettings(){
- if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- const feeEl=document.getElementById("entryFee");
- const deadlineEl=document.getElementById("deadline");
- const rulesEl=document.getElementById("rulesText");
- if(!feeEl||!deadlineEl||!rulesEl)return toast("Settings form not loaded. Refresh and try again.");
- const fee=normaliseNumber(feeEl.value,state.entryFee||5);
- const deadline=(deadlineEl.value||"").trim();
- const rules=(rulesEl.value||"").trim();
- if(!fee||fee<0)return toast("Enter a valid entry fee.");
- if(!deadline)return toast("Enter a deadline.");
- if(!rules)return toast("Enter the rules text.");
- state.entryFee=fee;
- state.deadline=deadline;
- state.rules=rules;
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving rules...");
- try{
-  await dbSaveSettings();
-  await loadAppSettingsFromSupabase();
-  toast("Rules and competition settings saved.");
- }catch(e){
-  console.error("Settings save failed",e);
-  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
- }
- render();
-}
-
-async function saveNotificationMessages(){
- if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- const unpaidEl=document.getElementById("noteUnpaid");
- const missingEl=document.getElementById("noteMissing");
- const winnerEl=document.getElementById("noteWinner");
- const rolloverEl=document.getElementById("noteRollover");
- if(!unpaidEl||!missingEl||!winnerEl||!rolloverEl)return toast("Notification form not loaded. Refresh and try again.");
- if(!state.notifications)state.notifications={};
- state.notifications.unpaid=(unpaidEl.value||"").trim();
- state.notifications.missingPick=(missingEl.value||"").trim();
- state.notifications.winner=(winnerEl.value||"").trim();
- state.notifications.rollover=(rolloverEl.value||"").trim();
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving notification messages...");
- try{
-  await dbSaveSettings();
-  await loadAppSettingsFromSupabase();
-  toast("Notification messages saved.");
- }catch(e){
-  console.error("Notification save failed",e);
-  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
- }
- render();
-}
-
-async function saveAnnouncementAndDisclaimer(){
- if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- const announcementEl=document.getElementById("announcementText");
- const disclaimerEl=document.getElementById("disclaimerText");
- if(!announcementEl||!disclaimerEl)return toast("Announcement form not loaded. Refresh and try again.");
- const oldAnnouncement=(state.announcement||"").trim();
- const newAnnouncement=(announcementEl.value||"").trim();
- state.announcement=newAnnouncement;
- if(newAnnouncement!==oldAnnouncement){
-  state.announcementVersion=(Number(state.announcementVersion||0)||0)+1;
- }
- state.disclaimer=(disclaimerEl.value||"").trim();
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving announcement and disclaimer...");
- try{
-  await dbSaveSettings();
-  await loadAppSettingsFromSupabase();
-  toast("Announcement and disclaimer saved.");
- }catch(e){
-  console.error("Announcement/disclaimer save failed",e);
-  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
- }
- render();
-}
-
-async function dbSaveSettings(){
- if(!supabaseClient)throw new Error("Supabase is not available.");
- if(!onlineReady)setOnlineStatus(true,"Database connected");
- ensureLeagues();
-
- const payload={
-  id:1,
-  join_code:state.joinCode||"SEAH2025",
-  entry_fee:Number(state.entryFee||5),
-  deadline:state.deadline||"Saturday 12:00",
-  rules:state.rules||"",
-  notifications:state.notifications||{},
-  leagues:state.leagues||{},
-  teams:state.teams||[],
-  announcement:state.announcement||"",
-  announcement_version:Number(state.announcementVersion||0)||0,
-  disclaimer:state.disclaimer||"",
-  updated_at:new Date().toISOString()
- };
-
- // Preferred path. The Supabase SQL repair file creates this function so one Save can
- // write the complete settings object without RLS/insert/column-cache problems.
- const rpc=await supabaseClient.rpc("save_app_settings",{p_settings:payload});
- if(!rpc.error)return true;
-
- const rpcMsg=String(rpc.error.message||"").toLowerCase();
- const rpcMissing=rpcMsg.includes("could not find the function")||rpcMsg.includes("function save_app_settings");
- if(!rpcMissing){
-  throw rpc.error;
- }
-
- // Fallback for older databases that already have all columns and allow direct update.
- const res=await supabaseClient
-  .from("app_settings")
-  .update({
-   join_code:payload.join_code,
-   entry_fee:payload.entry_fee,
-   deadline:payload.deadline,
-   rules:payload.rules,
-   notifications:payload.notifications,
-   leagues:payload.leagues,
-   teams:payload.teams,
-   announcement:payload.announcement,
-   announcement_version:payload.announcement_version,
-   disclaimer:payload.disclaimer,
-   updated_at:payload.updated_at
-  })
-  .eq("id",1)
-  .select("id")
-  .maybeSingle();
-
- if(!res.error&&res.data)return true;
-
- const msg=String(res.error?.message||"");
- if(msg.includes("Could not find")||msg.includes("column")||!res.data){
-  throw new Error("Supabase app_settings is missing the full settings setup. Run supabase_settings_repair.sql once, then save again.");
- }
- throw res.error||new Error("Settings row id=1 was not found.");
-}
-
-async function dbSaveTeams(){
- if(!onlineReady)setOnlineStatus(true,"Database connected");
- // Teams/leagues are saved in app_settings by dbSaveSettings. Keep this helper so global saves do not break.
- return dbSaveSettings();
-}
-
-async function dbUpsertPlayer(p){
- if(!p||!p.id)return false;
- if(!onlineReady)setOnlineStatus(true,"Database connected");
- const userUpdate={
-  display_name:p.name,
-  username:p.username||p.name,
-  role:p.adminPlayer?"admin":(p.role||"player"),
-  approved:!!p.approved,
-  notifications_enabled:p.notifications!==false
- };
- const userRes=await supabaseClient.from("app_users").update(userUpdate).eq("id",p.id);
- if(userRes.error)throw userRes.error;
-
- const stateRow={
-  user_id:p.id,
-  competition_number:Number(state.competition||1),
-  rollover_number:Number(state.rollover||0),
-  round_number:Number(state.round||1),
-  paid:!!p.paid,
-  alive:p.alive!==false,
-  wins:Number(p.wins||0),
-  pick:p.pick||null,
-  locked:!!p.locked,
-  result:p.result||"pending",
-  previous:Array.isArray(p.previous)?p.previous:[],
-  out_round:p.outRound||null,
-  out_pick:p.outPick||null,
-  updated_at:new Date().toISOString()
- };
- const attempts=[
-  stateRow,
-  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,locked:stateRow.locked,result:stateRow.result,previous:stateRow.previous,out_round:stateRow.out_round,out_pick:stateRow.out_pick},
-  {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,locked:stateRow.locked,result:stateRow.result,previous:stateRow.previous}
- ];
- let lastError=null;
- for(const row of attempts){
-  const res=await supabaseClient.from("player_state").upsert(row,{onConflict:"user_id"});
-  if(!res.error)return true;
-  lastError=res.error;
- }
- throw lastError||new Error("Could not save player state.");
-}
-
 async function saveChampionRecord(c){
- if(!c)return false;
- if(!onlineReady)setOnlineStatus(true,"Database connected");
+ if(!onlineReady||!c)return false;
  const p=state.players.find(x=>x.id===c.id||x.name===c.name);
  if(!p||!p.id)return false;
  const row={
@@ -2350,7 +2053,7 @@ async function saveChampionRecord(c){
 }
 
 async function dbSaveChampions(){
- if(!onlineReady)setOnlineStatus(true,"Database connected");
+ if(!onlineReady)return;
  const seen=new Set();
  const rows=(state.champions||[]).map(c=>{
   const p=state.players.find(x=>x.id===c.id||x.name===c.name);
@@ -2372,7 +2075,7 @@ async function dbSaveChampions(){
 }
 
 async function dbSyncAll(){
- if(!onlineReady)setOnlineStatus(true,"Database connected");
+ if(!onlineReady)return;
  const errors=[];
  for(const p of state.players){
   try{await dbUpsertPlayer(p);}catch(e){errors.push(e);}
@@ -2399,23 +2102,17 @@ async function loginUser(){
  const name=document.getElementById("loginName").value.trim();
  const pin=document.getElementById("loginPin").value.trim();
  const remember=document.getElementById("rememberMe").checked;
- if(!name||!pin)return toast("Enter username and password.");
- let u=null;
  try{
   const {data,error}=await supabaseClient.rpc("app_login",{p_username:name,p_password:pin});
   if(error)throw error;
   if(!data||!data.length)return toast("Account not found.");
-  u=data[0];
- }catch(e){
-  console.error("Login RPC failed",e);
-  return toast("Login failed.");
- }
-
- // From here the login has succeeded. Do not show a fake login failure if dashboard sync/render has a problem.
- try{
+  const u=data[0];
   authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
   if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  await syncUsersFromSupabase();
+  const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
+  if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
   if(u.role==="admin"){
    adminView="admin";
    localStorage.setItem("seah_admin_view_current",adminView);
@@ -2424,16 +2121,10 @@ async function loginUser(){
    state.selectedPlayer=u.display_name;
    page="myPick";
   }
-  await loadAppSettingsFromSupabase();
-  await loadAnnouncementDismissalsForUser();
-  try{await syncUsersFromSupabase();}catch(syncErr){console.warn("Post-login user sync skipped",syncErr);}
-  const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
-  if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
   render();
  }catch(e){
-  console.error("Post-login render/sync failed",e);
-  toast("Login succeeded. Refreshing dashboard...");
-  setTimeout(()=>location.reload(),500);
+  console.error(e);
+  toast("Login failed.");
  }
 }
 
@@ -2488,86 +2179,20 @@ async function createAccount(){
  }
 }
 
-function setOnlineStatus(ready,msg){
- onlineReady=!!ready;
- const el=document.getElementById("onlineStatus");
- if(!el)return;
- el.textContent=msg||(ready?"Database connected":"Database offline");
- el.style.background=ready?"#dcfce7":"#fee2e2";
- el.style.color=ready?"#14532d":"#991b1b";
-}
-
-async function loadAppSettingsFromSupabase(){
- try{
-  const {data,error}=await supabaseClient
-   .from("app_settings")
-   .select("*")
-   .eq("id",1)
-   .maybeSingle();
-  if(error)throw error;
-  if(!data)return false;
-  if(typeof data.join_code!=="undefined"&&data.join_code!==null)state.joinCode=data.join_code;
-  if(typeof data.entry_fee!=="undefined"&&data.entry_fee!==null)state.entryFee=Number(data.entry_fee)||state.entryFee;
-  if(typeof data.deadline!=="undefined"&&data.deadline!==null)state.deadline=data.deadline;
-  if(typeof data.rules!=="undefined"&&data.rules!==null)state.rules=data.rules;
-  if(data.notifications&&typeof data.notifications==="object")state.notifications=data.notifications;
-  if(typeof data.announcement!=="undefined"&&data.announcement!==null)state.announcement=data.announcement;
-  if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
-  if(typeof data.disclaimer!=="undefined"&&data.disclaimer!==null)state.disclaimer=data.disclaimer;
-  if(data.leagues&&typeof data.leagues==="object")state.leagues=data.leagues;
-  if(Array.isArray(data.teams))state.teams=data.teams;
-  else if(state.leagues)state.teams=Object.values(state.leagues).flat();
-  localStorage.setItem(storeKey,JSON.stringify(state));
-  return true;
- }catch(e){
-  console.warn("Could not load app settings",e);
-  return false;
- }
-}
-
 async function boot(){
  const saved=localStorage.getItem("seah_auth_user_current");
  if(saved){
   try{authUser=JSON.parse(saved);currentUserId=authUser.user_id||null;}catch(e){}
  }
-
- // The Supabase client is available even before a login. Previous builds never set
- // onlineReady=true, so Settings buttons and Factory Reset silently saved only locally.
- setOnlineStatus(true,"Database connected");
- await loadAppSettingsFromSupabase();
- await loadAnnouncementDismissalsForUser();
  render();
  await syncUsersFromSupabase();
- render();
 }
 
 
 
 if("serviceWorker" in navigator){
- window.addEventListener("load",async()=>{
-  // v49: clear old PWA cache/service worker so GitHub Pages serves the latest index.html.
-  // Old cached builds made the Settings Save buttons appear unchanged after upload.
-  try{
-   const regs=await navigator.serviceWorker.getRegistrations();
-   for(const reg of regs){await reg.unregister();}
-  }catch(e){console.warn("Service worker unregister failed",e);}
-  try{
-   if(window.caches){
-    const keys=await caches.keys();
-    for(const key of keys){await caches.delete(key);}
-   }
-  }catch(e){console.warn("Cache clear failed",e);}
- });
+ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js?v=27").catch(console.error));
 }
-
-window.rules=rules;
-window.settings=settings;
-window.playerSettings=playerSettings;
-window.saveSettings=saveSettings;
-window.saveAnnouncementAndDisclaimer=saveAnnouncementAndDisclaimer;
-window.saveNotificationMessages=saveNotificationMessages;
-window.dismissCurrentAnnouncement=dismissCurrentAnnouncement;
-window.factoryResetKeepAdmin=factoryResetKeepAdmin;
 
 boot();
 </script>
