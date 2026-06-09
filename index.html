@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v72 push registration + latest news visibility fix: no copy fallback, preserves service worker, current picks shown -->
+<!-- v73 targeted cleanup: removed Current Round Picks card, factory reset clears champions, auto-refresh push subscription -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1767,10 +1767,6 @@ function currentRoundPickSummary(){
 function latestNews(){
  ensureActivityLog();
  return `<div class="card news-card">
-  <div class="card-head"><strong>Current Round Picks</strong><span class="badge orange">Round ${state.round}</span></div>
-  <div class="card-body"><div class="activity-list">${currentRoundPickSummary()}</div></div>
- </div>
- <div class="card news-card">
   <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
   <div class="card-body">
    <div class="activity-list">
@@ -3279,7 +3275,7 @@ async function boot(){
  render();
  await syncUsersFromSupabase();
  await loadChampionRecords();
- await ensurePushRegistered(false);
+ await ensurePushRegistered(true);
  render();
 }
 
