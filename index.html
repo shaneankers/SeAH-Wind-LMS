@@ -1563,37 +1563,26 @@ async function notificationMessageFromSettings(type){
 
 async function notifyGroup(type,targets,message){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+
+ // The Edge Function now reads the correct notification template from Supabase
+ // Admin Settings and decides the recipients itself. This makes the app button
+ // match the direct Supabase test that already works.
  targets=Array.isArray(targets)?targets:[];
- if(!targets.length)return toast("No matching players to notify.");
+ const recipientNames=targets.map(p=>p.name).join(", ")||"Server-selected recipients";
+ const notificationType=notificationTemplateKey(type);
 
- try{message=await notificationMessageFromSettings(type);}
- catch(e){console.error(e);return toast(e.message||"Notification message missing from Settings.");}
-
- const userIds=targets.map(p=>p.id).filter(Boolean);
- const recipientNames=targets.map(p=>p.name).join(", ");
  let pushed=false;
  let pushError="";
  let pushDetail="";
  try{
   const res=await fetch(PUSH_FUNCTION_URL,{
    method:"POST",
-   headers:{
-    "Content-Type":"application/json",
-    "apikey":SUPABASE_PUBLISHABLE_KEY,
-    "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
-   },
-   body:JSON.stringify({
-    type:notificationTemplateKey(type),
-    user_ids:userIds,
-    usernames:targets.map(p=>p.name),
-    username:(targets.length===1?targets[0].name:null),
-    title:notificationTitle(type),
-    message:message
-   })
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({type:notificationType})
   });
   let json=null;
   try{json=await res.json();}catch(e){json=null;}
-  pushed=!!(res.ok&&json&&json.success!==false&&Number(json.sent||0)>0);
+  pushed=!!(res.ok&&json&&json.success===true&&Number(json.sent||0)>0);
   pushDetail=json?JSON.stringify(json):res.status+" "+res.statusText;
   if(!pushed){
    pushError=pushDetail;
@@ -1604,14 +1593,15 @@ async function notifyGroup(type,targets,message){
   console.warn("Push notification send failed",e);
  }
 
- addActivity("notify",(pushed?"Sent ":"Prepared ")+type+" notification",targets.length+" recipient"+(targets.length===1?"":"s"));
+ const detail=(pushed?"Sent by Supabase":(pushError||"No confirmed push delivery"));
+ addActivity("notify",(pushed?"Sent ":"Prepared ")+type+" notification",detail);
  await dbSaveActivityLog();
 
  if(pushed){
   toast("Notification sent from Settings message.");
  }else{
   toast("Push notification failed/not confirmed. Check player device notification registration.");
-  addAdminAlert("Push notification failed",(pushError||"No confirmed push delivery")+". Recipients: "+recipientNames+". Open the app once on each player device so notifications can register.");
+  addAdminAlert("Push notification failed",(pushError||"No confirmed push delivery")+". Recipients: "+recipientNames+".");
   await dbSaveActivityLog();
  }
  render();
