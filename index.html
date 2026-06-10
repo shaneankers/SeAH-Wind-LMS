@@ -4,8 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- Build: v85-pending-modal-no-inline-panel -->
-<!-- v85 pending notification modal only + current notification fixes -->
+<!-- v86 create-account notification permission prompt + device registration fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1390,7 +1389,6 @@ function render(){
  const content=document.getElementById("content");
  try{
   content.innerHTML=view();
-  setTimeout(showPendingNotificationModalIfNeeded,0);
  }catch(e){
   console.error("Render failed for page",page,e);
   content.innerHTML=`<div class="notice">Could not load this page. Please refresh. ${escapeHtml(e.message||"")}</div>`;
@@ -1934,7 +1932,7 @@ async function preAskNotificationPermission(){
   alert("Notifications are blocked for this site on this device. To receive reminders, open your browser/site settings and allow notifications for SeAH Wind LMS.");
   return false;
  }
- alert("Please allow notifications for SeAH Wind LMS so you can receive winner announcements, rollover updates, important alerts and pick reminders.");
+ alert("Notifications are important for SeAH Wind LMS. Please allow notifications when prompted so you can receive winner announcements, rollover updates, competition alerts and pick reminders before deadlines.");
  try{
   const permission=await Notification.requestPermission();
   if(permission==="granted"){
@@ -1960,7 +1958,7 @@ async function registerPushSubscription(){
  }
  if(permission!=="granted")throw new Error("Notification permission was not granted.");
 
- const registration=await navigator.serviceWorker.register("sw.js?v=76-notification-registration");
+ const registration=await navigator.serviceWorker.register("sw.js?v=86-notification-registration");
  await navigator.serviceWorker.ready;
 
  let subscription=await registration.pushManager.getSubscription();
@@ -2051,59 +2049,33 @@ function shouldShowPendingNotificationPrompt(){
 function markPendingNotificationPromptSeen(){
  try{localStorage.setItem(pendingNotificationPromptSeenKey(),"yes");}catch(e){}
 }
+
 function pendingNotificationPermissionBlock(){
- // v85: notification prompt is a modal only, never embedded in the pending dashboard.
- return "";
-}
-function pendingNotificationPermissionCard(){return "";}
-function pendingNotificationModalHtml(){
- const supported=("Notification" in window)&&("serviceWorker" in navigator)&&("PushManager" in window);
- let body="";
- let primary="";
- if(!supported){
-  body=`This browser does not support app notifications. You can still use the app, but winner announcements, rollover updates and pick reminders may not appear on this device.`;
-  primary=`<button onclick="dismissPendingNotificationModal()">OK</button>`;
- }else if(Notification.permission==="denied"){
-  body=`Notifications are currently blocked for this site. Please allow notifications in your browser or phone settings so you can receive winner announcements, rollover updates, important competition alerts and pick reminders before deadlines.`;
-  primary=`<button onclick="dismissPendingNotificationModal()">OK</button>`;
- }else if(Notification.permission==="granted"){
-  body=`Notifications are already allowed in this browser. Register this device so this account can receive winner announcements, rollover updates, important competition alerts and pick reminders before deadlines.`;
-  primary=`<button onclick="enableNotificationsFromPending()">Register This Device</button>`;
- }else{
-  body=`Please allow notifications so you can receive winner announcements, rollover updates, important competition alerts and pick reminders before deadlines. Keeping notifications enabled helps make sure you do not miss important LMS updates.`;
-  primary=`<button onclick="enableNotificationsFromPending()">Allow Notifications</button>`;
- }
- return `<div id="pendingNotificationModal" style="position:fixed;inset:0;background:rgba(2,8,23,.68);display:flex;align-items:center;justify-content:center;padding:18px;z-index:120">
-  <div style="background:white;border-radius:24px;box-shadow:var(--shadow);max-width:520px;width:100%;overflow:hidden">
-   <div style="padding:20px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fafc)">
-    <h3 style="margin:0;font-size:22px;letter-spacing:-.03em">Stay Updated with SeAH Wind LMS</h3>
-   </div>
-   <div style="padding:22px">
-    <div class="notice" style="margin:0;line-height:1.45"><strong>Please allow notifications for SeAH Wind LMS.</strong><br><br>${body}</div>
-    <div class="actions" style="margin-top:16px">
-     ${primary}
-     <button class="secondary" onclick="dismissPendingNotificationModal()">Not Now</button>
-    </div>
-   </div>
-  </div>
- </div>`;
-}
-function shouldOpenPendingNotificationModal(){
- if(!authUser||authUser.role==="admin")return false;
- const p=currentPlayer();
- if(!p||p.approved)return false;
- if(!shouldShowPendingNotificationPrompt())return false;
- if(document.getElementById("pendingNotificationModal"))return false;
- return true;
-}
-function showPendingNotificationModalIfNeeded(){
- if(!shouldOpenPendingNotificationModal())return;
- document.body.insertAdjacentHTML("beforeend",pendingNotificationModalHtml());
-}
-function dismissPendingNotificationModal(){
+ if(!shouldShowPendingNotificationPrompt())return "";
  markPendingNotificationPromptSeen();
- const modal=document.getElementById("pendingNotificationModal");
- if(modal)modal.remove();
+ const baseMessage=`<div class="notice" style="margin-top:12px"><strong>Please allow notifications for SeAH Wind LMS.</strong><br><br>Notifications help you receive winner announcements, rollover updates, important competition alerts and pick reminders before the deadline. Please keep notifications enabled for the best experience.</div>`;
+ if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
+  return `${baseMessage}<div class="notice" style="margin-top:10px">This browser does not support app notifications. You can still use the app, but reminders and competition alerts may not appear on this device.</div>`;
+ }
+ if(Notification.permission==="denied"){
+  return `${baseMessage}<div class="notice" style="margin-top:10px">Notifications are currently blocked for this site. Please allow notifications in your browser or phone settings so you can receive LMS alerts.</div>`;
+ }
+ const label=Notification.permission==="granted"?"Register This Device":"Allow Notifications";
+ const hint=Notification.permission==="granted"?"Notifications are already allowed in this browser. Press the button below to link this account to this device.":"Press the button below and choose Allow when your browser asks for permission.";
+ return `${baseMessage}<div class="muted" style="margin-top:10px">${hint}</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">${label}</button></div>`;
+}
+function pendingNotificationPermissionCard(){
+ if(!authUser||authUser.role==="admin")return "";
+ if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
+  return `<div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body"><div class="notice">This browser does not support app notifications. You can still use the app, but reminders and competition alerts may not appear on this device.</div></div></div>`;
+ }
+ if(Notification.permission==="granted"){
+  return `<div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body"><div class="notice">Notifications are allowed on this device. If this is a new account, press the button below to make sure this device is registered for SeAH Wind LMS alerts.</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">Register This Device</button></div></div></div>`;
+ }
+ if(Notification.permission==="denied"){
+  return `<div class="card"><div class="card-head"><strong>Notifications Required</strong></div><div class="card-body"><div class="notice">Notifications are currently blocked for this site. Please allow notifications in your browser or phone settings so you can receive winner announcements, rollover updates, important alerts and pick reminders.</div></div></div>`;
+ }
+ return `<div class="card"><div class="card-head"><strong>Allow Notifications</strong></div><div class="card-body"><div class="notice">Please allow notifications for SeAH Wind LMS. Notifications are used for winner announcements, rollover updates, important competition alerts and reminders if you are close to missing a pick.</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">Allow Notifications</button></div></div></div>`;
 }
 
 async function enableNotificationsFromPending(){
@@ -2112,7 +2084,6 @@ async function enableNotificationsFromPending(){
   await forceEnableNotificationsForLoggedInUser();
   await registerPushSubscription();
   toast("Notifications enabled and this device is registered.");
-  dismissPendingNotificationModal();
   await syncUsersFromSupabase();
   render();
  }catch(e){
@@ -3281,6 +3252,11 @@ async function createAccount(){
  const remember=document.getElementById("createRemember").checked;
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
+
+ // Ask for notification permission while this Create Account click is still active.
+ // If permission is granted, the device will be registered to the new account after creation.
+ // If the user declines, account creation continues normally.
+ await preAskNotificationPermission();
 
  let u=null;
  try{
