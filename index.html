@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v86 create-account notification permission prompt + device registration fix -->
+<!-- v87 audit stability fixes: activity clear persistence, safe rendering, robust factory reset -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -886,6 +886,8 @@ function currentPlayer(){
 function defendingChampion(){return state.champions.length?state.champions[state.champions.length-1].name:"None"}
 function stars(n){return n?"⭐".repeat(n):""}
 function displayName(p){return `${defendingChampion()===p.name?"🏆 ":""}${p.name} ${stars(p.wins)}`.trim()}
+function displayNameHtml(p){return escapeHtml(displayName(p));}
+function escapeAttr(value){return escapeHtml(value).replace(/`/g,"&#96;");}
 function isQueuedForNextCompetition(p){
  return !!(p&&p.result==="waiting_next_competition");
 }
@@ -1516,13 +1518,27 @@ function showLessPlayerNews(){
  window.__playerNewsLimit=PLAYER_NEWS_START;
  render();
 }
-function resetRecentActivity(){
+async function resetRecentActivity(){
  if(!confirm("Clear Recent Activity? This only clears the activity/news feed. It will not delete players, picks, payments or competition data."))return;
  state.activityLog=[];
+ state.pendingActivityLog=[];
  window.__adminActivityLimit=ADMIN_ACTIVITY_START;
  window.__playerNewsLimit=PLAYER_NEWS_START;
- toast("Recent Activity cleared.");
- save();
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ render();
+ try{
+  if(!supabaseClient)throw new Error("Supabase is not available.");
+  if(!onlineReady)setOnlineStatus(true,"Database connected");
+  const {error}=await supabaseClient
+   .from("app_settings")
+   .update({activity_log:[],updated_at:new Date().toISOString()})
+   .eq("id",1);
+  if(error)throw error;
+  toast("Recent Activity cleared.");
+ }catch(e){
+  console.error("Clear activity failed",e);
+  toast("Activity cleared on this device, but database clear failed: "+(e.message||"check Supabase"));
+ }
 }
 
 function announcementTargets(type){
@@ -1631,7 +1647,7 @@ function notifyRollover(){
 function renderActivityRows(limit){
  ensureActivityLog();
  const visible=(state.activityLog||[]).slice(0,limit);
- return visible.length?visible.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${a.title}</div><div class="activity-sub">${a.detail||""}</div></div></div><div class="activity-time">${activityTimeLabel(a.time)}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`;
+ return visible.length?visible.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${escapeHtml(a.title||"Activity")}</div><div class="activity-sub">${escapeHtml(a.detail||"")}</div></div></div><div class="activity-time">${escapeHtml(activityTimeLabel(a.time))}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`;
 }
 
 function dashboard(){
@@ -1642,7 +1658,7 @@ function dashboard(){
  const paidPlayers=paid();
  const alivePlayers=alive();
  ensureActivityLog();
- const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${a.title}</strong><div>${a.message}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
+ const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${escapeHtml(a.title||"Alert")}</strong><div>${escapeHtml(a.message||"")}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
  <div class="admin-hero">
   <div class="admin-hero-cell">
@@ -1699,7 +1715,7 @@ function players(){
    <div class="card-head"><strong>Pending Players</strong><span class="badge yellow">${pending.length}</span></div>
    <div class="card-body list">
      ${pending.length?pending.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row">
-       <div class="player-list-name">${p.name}</div>
+       <div class="player-list-name">${escapeHtml(p.name||"")}</div>
        <button class="small green" onclick="approvePlayer(${i})">Approve</button>
        <button class="small yellow" onclick="approveAndPay(${i})">Approve + Paid</button>
        <button class="small red" onclick="rejectPlayer(${i})">Reject</button>
@@ -1711,7 +1727,7 @@ function players(){
    <div class="card-head"><strong>Players</strong><span class="badge orange">${approved.length}</span></div>
    <div class="card-body list">
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
-       <div class="player-list-name" title="${displayName(p)}">${displayName(p)}</div>
+       <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
        <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
        <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
@@ -1733,9 +1749,9 @@ function round(){
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
      ${alive().map(p=>{const i=state.players.indexOf(p);return `<div class="round-compact-row final-correct">
-       <div class="round-name" title="${displayName(p)}">${displayName(p)}</div>
+       <div class="round-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="round-controls-8020">
-         <div><label>Team</label><select onchange="setPick(${i},this.value)"><option value="">Not picked</option>${state.teams.map(t=>`<option value="${t}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${t}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
+         <div><label>Team</label><select onchange="setPick(${i},this.value)"><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
          <div><label>Result</label><select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select></div>
        </div>
      </div>`}).join("")||`<div class="notice">No alive players.</div>`}
@@ -1752,11 +1768,11 @@ function myPick(){
   <div>
    <div class="kicker">Player Dashboard</div>
    <h2>Round ${state.round}</h2>
-   <div class="hero-sub">Deadline: ${state.deadline}</div>
+   <div class="hero-sub">Deadline: ${escapeHtml(state.deadline)}</div>
   </div>
   <div class="player-current">
    <div class="kicker">Current Pick</div>
-   <div class="hero-num">${p.pick||"No team selected"}</div>
+   <div class="hero-num">${escapeHtml(p.pick||"No team selected")}</div>
    <div class="hero-sub">${p.pick?'Submitted':'Awaiting selection'}</div>
   </div>
  </div>
@@ -1771,8 +1787,8 @@ function myPick(){
  <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body">
   ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
   <div class="pick-grid">
-   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${l}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${l}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${t}" ${selected===t?'selected':''} ${used?'disabled':''}>${t}${used?' (used)':''}</option>`}).join("")}</select></div>
+   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
+   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${used?'disabled':''}>${escapeHtml(t)}${used?' (used)':''}</option>`}).join("")}</select></div>
   </div>
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
@@ -1803,7 +1819,7 @@ function latestNews(){
   </div>
  </div>`;
 }
-function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${t}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
+function previous(){const p=currentPlayer();return `<div class="card"><div class="card-head"><strong>Previous Picks</strong></div><div class="card-body list">${p.previous.length?p.previous.map((t,i)=>`<div class="item"><div><div class="item-title">Round ${i+1}</div><div class="tiny">${escapeHtml(t)}</div></div><span class="badge green">Through</span></div>`).join(""):`<div class="notice">No previous picks.</div>`}</div></div>`}
 function competition(){
  const standing=alive();
  const eliminated=out();
@@ -1814,8 +1830,8 @@ function competition(){
     <span class="comp-mini-pill red">${eliminated.length} Eliminated</span>
    </div>
  </div>
- <div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${standing.length}</span></div><div class="card-body list">${standing.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div>
- <div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${eliminated.length}</span></div><div class="card-body list">${eliminated.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayName(p)}</div><div class="compact-detail">Round ${p.outRound} · ${p.outPick}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`;
+ <div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${standing.length}</span></div><div class="card-body list">${standing.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayNameHtml(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div>
+ <div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${eliminated.length}</span></div><div class="card-body list">${eliminated.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayNameHtml(p)}</div><div class="compact-detail">Round ${escapeHtml(p.outRound||"")} · ${escapeHtml(p.outPick||"")}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`;
 }
 function playerHall(){
  const sortedChamps=[];
@@ -1826,7 +1842,7 @@ function playerHall(){
  });
  const r=sortedChamps.length?sortedChamps[0].name:"None";
  const champ=state.players.find(p=>p.name===r);
- return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">${r} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">${c.name} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
+ return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">${escapeHtml(r)} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">${escapeHtml(c.name)} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
 }
 
 function rules(){
@@ -1850,7 +1866,7 @@ function playerSettings(){
  const p=currentPlayer();
  const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
  return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
-   <label>Display Name</label><input id="playerUsername" value="${p.name}">
+   <label>Display Name</label><input id="playerUsername" value="${escapeAttr(p.name||"")}">
    ${isAdminPlayer?`<div class="notice" style="margin-top:12px">This is also the administrator account, so password changes are managed from the admin side only.</div>`:`<label style="margin-top:12px">Password</label><input id="playerPin" type="password" value="${p.pin||""}">`}
    <br><br><button onclick="savePlayerAccount()">Save Account</button>
  </div></div>
@@ -2670,10 +2686,18 @@ async function factoryResetKeepAdmin(){
  if(!confirm("Factory Reset will delete all players, picks, payments, activity logs, Hall of Fame and competition history. The admin account and settings will be kept. Continue?"))return;
  try{
   const adminId=authUser.user_id;
-  const playerIds=state.players.filter(p=>p.id&&p.id!==adminId&&!p.adminPlayer).map(p=>p.id);
+  let playerIds=state.players.filter(p=>p.id&&p.id!==adminId&&!p.adminPlayer).map(p=>p.id);
 
   if(!onlineReady)setOnlineStatus(true,"Database connected");
   if(onlineReady){
+   // Pull the latest non-admin user IDs from Supabase before deleting.
+   // This avoids stale admin localStorage leaving old player accounts, picks or subscriptions behind.
+   const usersRead=await supabaseClient.from("app_users").select("id,role");
+   if(usersRead.error)throw usersRead.error;
+   const dbPlayerIds=(usersRead.data||[])
+    .filter(u=>u&&u.id&&u.id!==adminId&&u.role!=="admin")
+    .map(u=>u.id);
+   playerIds=[...new Set([...playerIds,...dbPlayerIds])];
    // Deliberately do NOT call the Supabase factory_reset_keep_admin RPC here.
    // The app cannot see what that SQL function deletes, so using explicit table targets is safer.
    // This reset clears player/account competition data only and leaves app_settings alone,
@@ -2686,6 +2710,7 @@ async function factoryResetKeepAdmin(){
     res=await supabaseClient.from("app_users").delete().in("id",playerIds); if(res.error)throw res.error;
    }
    res=await supabaseClient.from("champions").delete().gte("competition_number",0); if(res.error)throw res.error;
+   res=await supabaseClient.from("app_settings").update({activity_log:[],admin_alerts:[],updated_at:new Date().toISOString()}).eq("id",1); if(res.error)throw res.error;
    if(state.activeCompetitionId){
     res=await supabaseClient.from("competitions").update({
      competition_number:1,
@@ -2716,6 +2741,7 @@ async function factoryResetKeepAdmin(){
   state.potCarryover=0;
   state.champions=[];
   state.activityLog=[];
+  state.pendingActivityLog=[];
   state.adminAlerts=[];
   localStorage.setItem(storeKey,JSON.stringify(state));
   if(onlineReady){
