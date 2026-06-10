@@ -1745,7 +1745,7 @@ function round(){
 }
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
- if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div></div></div>${pendingNotificationPermissionCard()}`;
+ if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div>${pendingNotificationPermissionBlock()}</div></div>`;
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
  return `${announcementCard}<div class="player-top">
@@ -2038,6 +2038,32 @@ async function forceEnableNotificationsForLoggedInUser(){
 }
 
 
+
+function pendingNotificationPromptSeenKey(){
+ const id=(authUser&&authUser.user_id)||(authUser&&authUser.username)||"guest";
+ return "seah_pending_notification_prompt_seen_"+id;
+}
+function shouldShowPendingNotificationPrompt(){
+ try{return localStorage.getItem(pendingNotificationPromptSeenKey())!=="yes";}catch(e){return true;}
+}
+function markPendingNotificationPromptSeen(){
+ try{localStorage.setItem(pendingNotificationPromptSeenKey(),"yes");}catch(e){}
+}
+
+function pendingNotificationPermissionBlock(){
+ if(!shouldShowPendingNotificationPrompt())return "";
+ markPendingNotificationPromptSeen();
+ const baseMessage=`<div class="notice" style="margin-top:12px"><strong>Please allow notifications for SeAH Wind LMS.</strong><br><br>Notifications help you receive winner announcements, rollover updates, important competition alerts and pick reminders before the deadline. Please keep notifications enabled for the best experience.</div>`;
+ if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
+  return `${baseMessage}<div class="notice" style="margin-top:10px">This browser does not support app notifications. You can still use the app, but reminders and competition alerts may not appear on this device.</div>`;
+ }
+ if(Notification.permission==="denied"){
+  return `${baseMessage}<div class="notice" style="margin-top:10px">Notifications are currently blocked for this site. Please allow notifications in your browser or phone settings so you can receive LMS alerts.</div>`;
+ }
+ const label=Notification.permission==="granted"?"Register This Device":"Allow Notifications";
+ const hint=Notification.permission==="granted"?"Notifications are already allowed in this browser. Press the button below to link this account to this device.":"Press the button below and choose Allow when your browser asks for permission.";
+ return `${baseMessage}<div class="muted" style="margin-top:10px">${hint}</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">${label}</button></div>`;
+}
 function pendingNotificationPermissionCard(){
  if(!authUser||authUser.role==="admin")return "";
  if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
