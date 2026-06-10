@@ -1520,24 +1520,36 @@ function showLessPlayerNews(){
 }
 async function resetRecentActivity(){
  if(!confirm("Clear Recent Activity? This only clears the activity/news feed. It will not delete players, picks, payments or competition data."))return;
- state.activityLog=[];
- state.pendingActivityLog=[];
- window.__adminActivityLimit=ADMIN_ACTIVITY_START;
- window.__playerNewsLimit=PLAYER_NEWS_START;
- localStorage.setItem(storeKey,JSON.stringify(state));
- render();
  try{
   if(!supabaseClient)throw new Error("Supabase is not available.");
   if(!onlineReady)setOnlineStatus(true,"Database connected");
-  const {error}=await supabaseClient
-   .from("app_settings")
-   .update({activity_log:[],updated_at:new Date().toISOString()})
-   .eq("id",1);
-  if(error)throw error;
+
+  // Clear locally first so the complete settings save below writes an empty feed.
+  state.activityLog=[];
+  state.pendingActivityLog=[];
+  window.__adminActivityLimit=ADMIN_ACTIVITY_START;
+  window.__playerNewsLimit=PLAYER_NEWS_START;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+
+  // Use the same robust settings-save path as the Settings screen. This uses the
+  // save_app_settings RPC when available, avoiding RLS/direct-update cases where
+  // Supabase accepts the request but does not actually clear the shared feed.
+  await dbSaveSettings();
+
+  // Verify the shared database feed is now empty before showing success.
+  const check=await supabaseClient.from("app_settings").select("activity_log").eq("id",1).maybeSingle();
+  if(check.error)throw check.error;
+  const shared=Array.isArray(check.data?.activity_log)?check.data.activity_log:[];
+  if(shared.length)throw new Error("Database activity log was not cleared.");
+
+  state.activityLog=[];
+  state.pendingActivityLog=[];
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
   toast("Recent Activity cleared.");
  }catch(e){
   console.error("Clear activity failed",e);
-  toast("Activity cleared on this device, but database clear failed: "+(e.message||"check Supabase"));
+  toast("Activity was not cleared from the database: "+(e.message||"check Supabase"));
  }
 }
 
