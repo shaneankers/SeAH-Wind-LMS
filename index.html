@@ -1577,7 +1577,11 @@ async function notifyGroup(type,targets,message){
  try{
   const res=await fetch(PUSH_FUNCTION_URL,{
    method:"POST",
-   headers:{"Content-Type":"application/json"},
+   headers:{
+    "Content-Type":"application/json",
+    "apikey":SUPABASE_PUBLISHABLE_KEY,
+    "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
+   },
    body:JSON.stringify({type:notificationType})
   });
   let json=null;
