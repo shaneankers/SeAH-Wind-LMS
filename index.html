@@ -1575,25 +1575,21 @@ async function notifyGroup(type,targets,message){
  let pushError="";
  let pushDetail="";
  try{
-  const res=await fetch(PUSH_FUNCTION_URL,{
-   method:"POST",
-   headers:{
-    "Content-Type":"application/json",
-    "apikey":SUPABASE_PUBLISHABLE_KEY,
-    "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY
-   },
-   body:JSON.stringify({type:notificationType})
+  // Use Supabase JS function invocation instead of raw fetch. This avoids
+  // browser/CORS/header differences between the app button and the Supabase
+  // dashboard test. The Edge Function reads Settings and recipients itself.
+  const {data:json,error:fnError}=await supabaseClient.functions.invoke("push-notifications",{
+   body:{type:notificationType}
   });
-  let json=null;
-  try{json=await res.json();}catch(e){json=null;}
-  pushed=!!(res.ok&&json&&json.success===true&&Number(json.sent||0)>0);
-  pushDetail=json?JSON.stringify(json):res.status+" "+res.statusText;
+  if(fnError)throw fnError;
+  pushed=!!(json&&json.success===true&&Number(json.sent||0)>0);
+  pushDetail=json?JSON.stringify(json):"No response data from push function";
   if(!pushed){
    pushError=pushDetail;
-   console.warn("Push notification send was not confirmed",res.status,pushError);
+   console.warn("Push notification send was not confirmed",pushError);
   }
  }catch(e){
-  pushError=e.message||"network/function error";
+  pushError=e.message||String(e)||"network/function error";
   console.warn("Push notification send failed",e);
  }
 
@@ -1749,7 +1745,7 @@ function round(){
 }
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
- if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account is awaiting admin approval.</div></div></div>`;
+ if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div></div></div>${pendingNotificationPermissionCard()}`;
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
  return `${announcementCard}<div class="player-top">
@@ -1936,7 +1932,7 @@ async function preAskNotificationPermission(){
   alert("Notifications are blocked for this site on this device. To receive reminders, open your browser/site settings and allow notifications for SeAH Wind LMS.");
   return false;
  }
- alert("Please keep notifications turned on for the best experience. You will receive pick reminders and competition updates.");
+ alert("Please allow notifications for SeAH Wind LMS so you can receive winner announcements, rollover updates, important alerts and pick reminders.");
  try{
   const permission=await Notification.requestPermission();
   if(permission==="granted"){
@@ -2038,6 +2034,39 @@ async function forceEnableNotificationsForLoggedInUser(){
  }catch(e){
   console.warn("Notification enable RPC failed",e);
   return false;
+ }
+}
+
+
+function pendingNotificationPermissionCard(){
+ if(!authUser||authUser.role==="admin")return "";
+ if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
+  return `<div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body"><div class="notice">This browser does not support app notifications. You can still use the app, but reminders and competition alerts may not appear on this device.</div></div></div>`;
+ }
+ if(Notification.permission==="granted"){
+  return `<div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body"><div class="notice">Notifications are allowed on this device. If this is a new account, press the button below to make sure this device is registered for SeAH Wind LMS alerts.</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">Register This Device</button></div></div></div>`;
+ }
+ if(Notification.permission==="denied"){
+  return `<div class="card"><div class="card-head"><strong>Notifications Required</strong></div><div class="card-body"><div class="notice">Notifications are currently blocked for this site. Please allow notifications in your browser or phone settings so you can receive winner announcements, rollover updates, important alerts and pick reminders.</div></div></div>`;
+ }
+ return `<div class="card"><div class="card-head"><strong>Allow Notifications</strong></div><div class="card-body"><div class="notice">Please allow notifications for SeAH Wind LMS. Notifications are used for winner announcements, rollover updates, important competition alerts and reminders if you are close to missing a pick.</div><div class="actions" style="margin-top:12px"><button onclick="enableNotificationsFromPending()">Allow Notifications</button></div></div></div>`;
+}
+
+async function enableNotificationsFromPending(){
+ if(!authUser||!authUser.user_id)return toast("Please log in first.");
+ try{
+  await forceEnableNotificationsForLoggedInUser();
+  await registerPushSubscription();
+  toast("Notifications enabled and this device is registered.");
+  await syncUsersFromSupabase();
+  render();
+ }catch(e){
+  console.error("Pending notification registration failed",e);
+  if((e.message||"").includes("permission")){
+   toast("Notifications were not allowed on this device.");
+  }else{
+   toast("Could not register notifications: "+(e.message||"unknown error"));
+  }
  }
 }
 
@@ -3122,7 +3151,6 @@ async function loginUser(){
  const pin=document.getElementById("loginPin").value.trim();
  const remember=document.getElementById("rememberMe").checked;
  if(!name||!pin)return toast("Enter username and password.");
- await preAskNotificationPermission();
  let u=null;
  try{
   const {data,error}=await supabaseClient.rpc("app_login",{p_username:name,p_password:pin});
@@ -3153,7 +3181,7 @@ async function loginUser(){
   await loadChampionRecords();
   const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
   if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
-  await ensurePushRegistered(true);
+  await ensurePushRegistered(false);
   render();
  }catch(e){
   console.error("Post-login render/sync failed",e);
@@ -3198,7 +3226,6 @@ async function createAccount(){
  const remember=document.getElementById("createRemember").checked;
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
- await preAskNotificationPermission();
 
  let u=null;
  try{
@@ -3276,7 +3303,7 @@ async function createAccount(){
   authUser.notifications_enabled=true;
   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
   localStorage.setItem(storeKey,JSON.stringify(state));
-  await ensurePushRegistered(true);
+  await ensurePushRegistered(false);
   render();
  }catch(e){
   console.error("Post-create render/sync failed",e);
