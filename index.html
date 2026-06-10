@@ -1520,39 +1520,49 @@ function showLessPlayerNews(){
 }
 async function resetRecentActivity(){
  if(!confirm("Clear Recent Activity? This only clears the activity/news feed. It will not delete players, picks, payments or competition data."))return;
+
  try{
   if(!supabaseClient)throw new Error("Supabase is not available.");
   if(!onlineReady)setOnlineStatus(true,"Database connected");
 
-  // Clear locally first so the complete settings save below writes an empty feed.
   state.activityLog=[];
   state.pendingActivityLog=[];
+  state.adminAlerts=[];
   window.__adminActivityLimit=ADMIN_ACTIVITY_START;
   window.__playerNewsLimit=PLAYER_NEWS_START;
   localStorage.setItem(storeKey,JSON.stringify(state));
 
-  // Use the same robust settings-save path as the Settings screen. This uses the
-  // save_app_settings RPC when available, avoiding RLS/direct-update cases where
-  // Supabase accepts the request but does not actually clear the shared feed.
-  await dbSaveSettings();
+  const rpc=await supabaseClient.rpc("clear_activity_log");
+  if(rpc.error)throw rpc.error;
 
-  // Verify the shared database feed is now empty before showing success.
-  const check=await supabaseClient.from("app_settings").select("activity_log").eq("id",1).maybeSingle();
+  const check=await supabaseClient
+   .from("app_settings")
+   .select("activity_log,admin_alerts")
+   .eq("id",1)
+   .maybeSingle();
+
   if(check.error)throw check.error;
-  const shared=Array.isArray(check.data?.activity_log)?check.data.activity_log:[];
-  if(shared.length)throw new Error("Database activity log was not cleared.");
+
+  const activity=Array.isArray(check.data?.activity_log)?check.data.activity_log:[];
+  const alerts=Array.isArray(check.data?.admin_alerts)?check.data.admin_alerts:[];
+
+  if(activity.length || alerts.length){
+   throw new Error("Database still contains activity after clear.");
+  }
 
   state.activityLog=[];
   state.pendingActivityLog=[];
+  state.adminAlerts=[];
   localStorage.setItem(storeKey,JSON.stringify(state));
+
   render();
   toast("Recent Activity cleared.");
  }catch(e){
   console.error("Clear activity failed",e);
-  toast("Activity was not cleared from the database: "+(e.message||"check Supabase"));
+  toast("Activity was not cleared: "+(e.message||"check Supabase"));
  }
 }
-
+  
 function announcementTargets(type){
  if(type==="unpaid")return state.players.filter(p=>p.approved&&!p.paid&&p.notifications!==false);
  if(type==="missing")return alive().filter(p=>!p.pick&&p.notifications!==false);
