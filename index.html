@@ -807,6 +807,42 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
  .activity-time{display:block!important;white-space:normal!important;margin-left:48px!important;margin-top:5px!important;font-size:11px!important;}
 }
 
+/* v91 compact admin contact details */
+.admin-contact-card{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+  padding:14px 16px;
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+  max-width:620px;
+}
+.admin-contact-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:15px;
+  color:var(--ink);
+}
+.admin-contact-icon{
+  width:24px;
+  display:inline-flex;
+  justify-content:center;
+}
+.admin-contact-note{
+  margin-top:4px;
+  border-top:1px solid #edf2f7;
+  padding-top:10px;
+  color:#64748b;
+  font-size:13px;
+  line-height:1.45;
+}
+@media(max-width:560px){
+ .admin-contact-card{max-width:none;padding:13px}
+ .admin-contact-line{font-size:14px}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1948,15 +1984,20 @@ function ensureContactDetails(){
 }
 function contactDetailsCard(){
  const c=ensureContactDetails();
- const hasDetails=!!((c.name||"").trim()||(c.phone||"").trim()||(c.message||"").trim());
+ const name=(c.name||"").trim();
+ const phone=(c.phone||"").trim();
+ const message=(c.message||"").trim()||"If you have any issues with the competition, payments, picks or the app, please contact the administrator directly.";
+ const hasDetails=!!(name||phone);
  if(!hasDetails){
-  return `<div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body"><div class="notice">No contact details have been added yet.</div></div></div>`;
+  return `<div class="card"><div class="card-head"><strong>Admin Contact Details</strong></div><div class="card-body"><div class="notice">Admin contact details have not been added yet.</div></div></div>`;
  }
- return `<div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body list">
-  ${(c.name||"").trim()?`<div class="item"><div><div class="item-title">Contact Name</div><div class="tiny">${escapeHtml(c.name)}</div></div></div>`:""}
-  ${(c.phone||"").trim()?`<div class="item"><div><div class="item-title">Phone / WhatsApp</div><div class="tiny">${escapeHtml(c.phone)}</div></div><a href="tel:${escapeAttr(c.phone)}"><button class="small">Call</button></a></div>`:""}
-  ${(c.message||"").trim()?`<div class="notice">${textToHtml(c.message)}</div>`:""}
- </div></div>`;
+ return `<div class="card news-card"><div class="card-head"><strong>Admin Contact Details</strong></div><div class="card-body">
+   <div class="admin-contact-card">
+    ${name?`<div class="admin-contact-line"><span class="admin-contact-icon">👤</span><span><strong>Name:</strong> ${escapeHtml(name)}</span></div>`:""}
+    ${phone?`<div class="admin-contact-line"><span class="admin-contact-icon">📞</span><span><strong>Contact Number:</strong> ${escapeHtml(phone)}</span></div>`:""}
+    <div class="admin-contact-note">${textToHtml(message)}</div>
+   </div>
+  </div></div>`;
 }
 
 function playerSettings(){
@@ -2367,13 +2408,13 @@ function settings(){
   <br><button onclick="copyInvite()">Copy Invite Message</button>
  </div></div>
 
- <div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body">
+ <div class="card"><div class="card-head"><strong>Admin Contact Details</strong></div><div class="card-body">
   <div class="formrow">
-   <div><label>Contact name</label><input id="contactName" value="${escapeAttr(ensureContactDetails().name)}" placeholder="Example: Shane"></div>
-   <div><label>Phone / WhatsApp</label><input id="contactPhone" value="${escapeAttr(ensureContactDetails().phone)}" placeholder="Example: 07...">
+   <div><label>Name</label><input id="contactName" value="${escapeAttr(ensureContactDetails().name)}" placeholder="Example: Shane"></div>
+   <div><label>Contact number</label><input id="contactPhone" value="${escapeAttr(ensureContactDetails().phone)}" placeholder="Example: 07...">
    </div>
   </div>
-  <label>Message shown to players</label><textarea id="contactMessage" rows="3" placeholder="Example: Message me if you have any issues with picks, payments or app access.">${escapeHtml(ensureContactDetails().message)}</textarea>
+  <label>Message shown to players</label><textarea id="contactMessage" rows="3" placeholder="If you have any issues with the competition, payments, picks or the app, please contact the administrator directly.">${escapeHtml(ensureContactDetails().message||"If you have any issues with the competition, payments, picks or the app, please contact the administrator directly.")}</textarea>
   <br><br><button onclick="saveContactDetails()">Save Contact Details</button>
  </div></div>
 
