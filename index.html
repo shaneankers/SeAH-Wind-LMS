@@ -857,6 +857,7 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
   winner:"Winner announcement: {winner} has won SeAH Wind LMS Competition #{competition}.",
   rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."
  },
+ contactDetails:{name:"",phone:"",message:""},
  teams:["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham","Leeds","Sunderland","Birmingham","Coventry","Ipswich","Leicester","Middlesbrough","Southampton"],
  leagues:{
   "Premier League":["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham"],
@@ -1454,7 +1455,14 @@ function setPage(p){
   syncUsersAndRender();
  }
 }
-function dismissAdminAlert(i){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.splice(i,1);save()}
+async function dismissAdminAlert(i){
+ if(!state.adminAlerts)state.adminAlerts=[];
+ state.adminAlerts.splice(i,1);
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ render();
+ try{await dbSaveSettings();}
+ catch(e){console.warn("Could not save dismissed admin alert",e);toast("Alert dismissed on this device, but database save failed.");}
+}
 function addAdminAlert(title,message){if(!state.adminAlerts)state.adminAlerts=[];state.adminAlerts.unshift({title,message,created:new Date().toISOString()});}
 
 function appIcon(name){
@@ -1928,6 +1936,29 @@ function rules(){
  ${disclaimerHtml}`;
 }
 
+function ensureContactDetails(){
+ if(!state.contactDetails||typeof state.contactDetails!=="object")state.contactDetails={name:"",phone:"",message:""};
+ if(state.notifications&&state.notifications.contactDetails&&typeof state.notifications.contactDetails==="object"){
+  state.contactDetails={...state.contactDetails,...state.notifications.contactDetails};
+ }
+ state.contactDetails.name=String(state.contactDetails.name||"");
+ state.contactDetails.phone=String(state.contactDetails.phone||"");
+ state.contactDetails.message=String(state.contactDetails.message||"");
+ return state.contactDetails;
+}
+function contactDetailsCard(){
+ const c=ensureContactDetails();
+ const hasDetails=!!((c.name||"").trim()||(c.phone||"").trim()||(c.message||"").trim());
+ if(!hasDetails){
+  return `<div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body"><div class="notice">No contact details have been added yet.</div></div></div>`;
+ }
+ return `<div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body list">
+  ${(c.name||"").trim()?`<div class="item"><div><div class="item-title">Contact Name</div><div class="tiny">${escapeHtml(c.name)}</div></div></div>`:""}
+  ${(c.phone||"").trim()?`<div class="item"><div><div class="item-title">Phone / WhatsApp</div><div class="tiny">${escapeHtml(c.phone)}</div></div><a href="tel:${escapeAttr(c.phone)}"><button class="small">Call</button></a></div>`:""}
+  ${(c.message||"").trim()?`<div class="notice">${textToHtml(c.message)}</div>`:""}
+ </div></div>`;
+}
+
 function playerSettings(){
  const p=currentPlayer();
  const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
@@ -1944,6 +1975,8 @@ function playerSettings(){
    </div>
    <div class="tiny" style="margin-top:10px">Turn this on to allow this device to receive SêAH Wind LMS push notifications.</div>
  </div></div>
+
+ ${contactDetailsCard()}
 
  <div class="card"><div class="card-head"><strong>Install App</strong></div><div class="card-body">
    <button class="install-button" onclick="addAppGuide()">📲 Install SêAH Wind LMS</button>
@@ -2334,7 +2367,17 @@ function settings(){
   <br><button onclick="copyInvite()">Copy Invite Message</button>
  </div></div>
 
- <div class="card"><div class="card-head"><strong>Competition Rules</strong><span class="badge orange">v59 verified</span></div><div class="card-body">
+ <div class="card"><div class="card-head"><strong>Contact Details</strong></div><div class="card-body">
+  <div class="formrow">
+   <div><label>Contact name</label><input id="contactName" value="${escapeAttr(ensureContactDetails().name)}" placeholder="Example: Shane"></div>
+   <div><label>Phone / WhatsApp</label><input id="contactPhone" value="${escapeAttr(ensureContactDetails().phone)}" placeholder="Example: 07...">
+   </div>
+  </div>
+  <label>Message shown to players</label><textarea id="contactMessage" rows="3" placeholder="Example: Message me if you have any issues with picks, payments or app access.">${escapeHtml(ensureContactDetails().message)}</textarea>
+  <br><br><button onclick="saveContactDetails()">Save Contact Details</button>
+ </div></div>
+
+ <div class="card"><div class="card-head"><strong>Competition Rules</strong></div><div class="card-body">
   <div class="formrow">
    <div><label>Entry fee</label><input id="entryFee" type="number" value="${escapeHtml(state.entryFee)}"></div>
    <div><label>Deadline</label><input id="deadline" value="${escapeHtml(state.deadline||"")}"></div>
@@ -2601,7 +2644,9 @@ async function resetPlayerPassword(i){
   if(error)throw error;
   toast("Password reset for "+p.name+".");
   addAdminAlert("Password reset",p.name+" now has a temporary password. They will be forced to change it on next login.");
-  save();
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  try{await dbSaveSettings();}catch(settingsErr){console.warn("Password reset alert did not sync",settingsErr);} 
  }catch(e){
   console.error(e);
   toast("Password reset failed: "+(e.message||"unknown error"));
@@ -2859,6 +2904,33 @@ async function saveSettings(){
  render();
 }
 
+async function saveContactDetails(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const nameEl=document.getElementById("contactName");
+ const phoneEl=document.getElementById("contactPhone");
+ const msgEl=document.getElementById("contactMessage");
+ if(!nameEl||!phoneEl||!msgEl)return toast("Contact form not loaded. Refresh and try again.");
+ ensureContactDetails();
+ state.contactDetails={
+  name:(nameEl.value||"").trim(),
+  phone:(phoneEl.value||"").trim(),
+  message:(msgEl.value||"").trim()
+ };
+ if(!state.notifications||typeof state.notifications!=="object")state.notifications={};
+ state.notifications.contactDetails=state.contactDetails;
+ localStorage.setItem(storeKey,JSON.stringify(state));
+ toast("Saving contact details...");
+ try{
+  await dbSaveSettings();
+  await loadAppSettingsFromSupabase();
+  toast("Contact details saved.");
+ }catch(e){
+  console.error("Contact details save failed",e);
+  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
+ }
+ render();
+}
+
 async function saveNotificationMessages(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  const unpaidEl=document.getElementById("noteUnpaid");
@@ -2914,6 +2986,11 @@ async function dbSaveSettings(){
  if(!onlineReady)setOnlineStatus(true,"Database connected");
  ensureLeagues();
 
+ ensureContactDetails();
+ if(!state.notifications||typeof state.notifications!=="object")state.notifications={};
+ state.notifications.contactDetails=state.contactDetails;
+ const notificationsPayload={...state.notifications,contactDetails:state.contactDetails};
+
  const payload={
   id:1,
   join_code:state.joinCode||"SEAH2025",
@@ -2924,7 +3001,7 @@ async function dbSaveSettings(){
   pot_carryover:Number(state.potCarryover||0),
   deadline:state.deadline||"Saturday 12:00",
   rules:state.rules||"",
-  notifications:state.notifications||{},
+  notifications:notificationsPayload,
   leagues:state.leagues||{},
   teams:state.teams||[],
   announcement:state.announcement||"",
@@ -3496,7 +3573,10 @@ async function loadAppSettingsFromSupabase(){
   if(typeof data.pot_carryover!=="undefined"&&data.pot_carryover!==null)state.potCarryover=Number(data.pot_carryover)||0;
   if(typeof data.deadline!=="undefined"&&data.deadline!==null)state.deadline=data.deadline;
   if(typeof data.rules!=="undefined"&&data.rules!==null)state.rules=data.rules;
-  if(data.notifications&&typeof data.notifications==="object")state.notifications=data.notifications;
+  if(data.notifications&&typeof data.notifications==="object"){
+   state.notifications=data.notifications;
+   if(data.notifications.contactDetails&&typeof data.notifications.contactDetails==="object")state.contactDetails=data.notifications.contactDetails;
+  }
   if(typeof data.announcement!=="undefined"&&data.announcement!==null)state.announcement=data.announcement;
   if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
   if(typeof data.disclaimer!=="undefined"&&data.disclaimer!==null)state.disclaimer=data.disclaimer;
