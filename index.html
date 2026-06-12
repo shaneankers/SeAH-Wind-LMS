@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v87 audit stability fixes: activity clear persistence, safe rendering, robust factory reset -->
+<!-- v89 Supabase player sync source-of-truth fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -949,6 +949,32 @@ function noteText(key, extra={}){
 }
 
 
+async function getLiveSupabaseUserIds(){
+ try{
+  if(!supabaseClient)return null;
+  const res=await supabaseClient.from("app_users").select("id");
+  if(res.error)throw res.error;
+  const ids=new Set((res.data||[]).map(u=>u.id).filter(Boolean));
+  window.__validSupabaseUserIds=ids;
+  return ids;
+ }catch(e){
+  console.warn("Could not refresh Supabase user id list",e);
+  return null;
+ }
+}
+
+function purgeLocalPlayersNotInSupabase(validUserIds,validUsernames){
+ if(!validUserIds||!Array.isArray(state.players))return false;
+ const before=state.players.length;
+ state.players=state.players.filter(p=>{
+  if(!p)return false;
+  if(p.id)return validUserIds.has(p.id);
+  const key=String(p.username||p.name||"").trim().toLowerCase();
+  return !!(key&&validUsernames&&validUsernames.has(key));
+ });
+ return state.players.length!==before;
+}
+
 async function syncUsersFromSupabase(){
  try{
   if(!supabaseClient)return false;
@@ -962,6 +988,26 @@ async function syncUsersFromSupabase(){
 
   if(usersRes.error)throw usersRes.error;
   const users=Array.isArray(usersRes.data)?usersRes.data:[];
+  const validUserIds=new Set(users.map(u=>u.id).filter(Boolean));
+  const validUsernames=new Set(users.map(u=>String(u.username||u.display_name||"").trim().toLowerCase()).filter(Boolean));
+  window.__validSupabaseUserIds=validUserIds;
+
+  let changed=false;
+
+  // Supabase is the source of truth for users. If a player was deleted on another
+  // device, remove their stale localStorage copy instead of showing or re-saving it.
+  if(purgeLocalPlayersNotInSupabase(validUserIds,validUsernames)){
+   changed=true;
+  }
+
+  // If this device is still logged in as a deleted account, clear the stale login.
+  if(authUser&&authUser.user_id&&!validUserIds.has(authUser.user_id)){
+   authUser=null;
+   localStorage.removeItem("seah_auth_user_current");
+   localStorage.setItem(storeKey,JSON.stringify(state));
+   setTimeout(()=>renderAuth(),0);
+   return true;
+  }
 
   let stateRows=[];
   try{
@@ -985,7 +1031,6 @@ async function syncUsersFromSupabase(){
   }
 
   const stateByUserId=new Map(stateRows.map(r=>[r.user_id,r]));
-  let changed=false;
 
   // Keep the shared competition/round values in step with Supabase.
   // Older builds saved these values on player_state rows but did not load them back,
@@ -1006,8 +1051,7 @@ async function syncUsersFromSupabase(){
 
   users.forEach(u=>{
    const existing=state.players.find(p=>p.id===u.id)
-    ||state.players.find(p=>(p.username||"").toLowerCase()===(u.username||"").toLowerCase())
-    ||state.players.find(p=>(p.name||"").toLowerCase()===(u.display_name||u.username||"").toLowerCase());
+    ||state.players.find(p=>(p.username||"").toLowerCase()===(u.username||"").toLowerCase());
 
    const ps=stateByUserId.get(u.id)||{};
    const target=existing||{
@@ -2446,9 +2490,11 @@ async function rejectPlayer(i){
    if(error)throw error;
   }
   state.players.splice(i,1);
+  if(window.__validSupabaseUserIds instanceof Set)window.__validSupabaseUserIds.delete(p.id);
   addActivity("player",p.name+" removed","Player deleted by admin");
   toast(p.name+" removed.");
   await saveNow();
+  await syncUsersFromSupabase();
  }catch(e){
   console.error(e);
   toast("Could not remove player: "+(e.message||"unknown error"));
@@ -2986,6 +3032,11 @@ async function dbSaveTeams(){
 
 async function dbUpsertPlayer(p){
  if(!p||!p.id)return false;
+ const validIds=window.__validSupabaseUserIds;
+ if(validIds instanceof Set&&!validIds.has(p.id)){
+  console.warn("Skipping save for deleted/stale local player",p.name||p.username||p.id);
+  return false;
+ }
  if(!onlineReady)setOnlineStatus(true,"Database connected");
  const userUpdate={
   display_name:p.name,
@@ -3188,9 +3239,18 @@ async function saveNow(){
   if(supabaseClient){
    if(!onlineReady)setOnlineStatus(true,"Database connected");
 
-   // Admin actions may change many players at once, so save every player row.
+   // Admin actions may change many players at once, but Supabase remains the
+   // source of truth. Refresh ids first so deleted localStorage players cannot be
+   // re-saved from an old phone/browser.
    if(authUser&&authUser.role==="admin"){
-    const playersToSave=(state.players||[]).filter(p=>p&&p.id);
+    const liveIds=await getLiveSupabaseUserIds();
+    if(liveIds){
+     const before=state.players.length;
+     state.players=state.players.filter(p=>p&&p.id&&liveIds.has(p.id));
+     if(state.players.length!==before)localStorage.setItem(storeKey,JSON.stringify(state));
+    }
+    const validIds=window.__validSupabaseUserIds;
+    const playersToSave=(state.players||[]).filter(p=>p&&p.id&&(!(validIds instanceof Set)||validIds.has(p.id)));
     for(const p of playersToSave){
      await dbUpsertPlayer(p);
     }
