@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v89 Supabase player sync source-of-truth fix -->
+<!-- v92 safe account removal + admin button tidy -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -841,6 +841,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 @media(max-width:560px){
  .admin-contact-card{max-width:none;padding:13px}
  .admin-contact-line{font-size:14px}
+}
+
+/* v92 admin action colour tidy */
+.player-edit-panel button.small.secondary,
+.player-edit-panel button.small.ghost{
+  background:#0f2747!important;
+  color:white!important;
+  box-shadow:0 10px 22px rgba(15,39,71,.16)!important;
+}
+.player-edit-panel button.small.red{
+  background:#dc2626!important;
+  color:white!important;
+}
+.player-edit-panel button.small.green{
+  background:#16a34a!important;
+  color:white!important;
 }
 
 </style>
@@ -1827,7 +1843,7 @@ function players(){
      ${pending.length?pending.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row">
        <div class="player-list-name">${escapeHtml(p.name||"")}</div>
        <button class="small green" onclick="approvePlayer(${i})">Approve</button>
-       <button class="small yellow" onclick="approveAndPay(${i})">Approve + Paid</button>
+       <button class="small green" onclick="approveAndPay(${i})">Approve + Paid</button>
        <button class="small red" onclick="rejectPlayer(${i})">Reject</button>
      </div>`}).join(""):`<div class="notice">No pending players.</div>`}
    </div>
@@ -1847,7 +1863,7 @@ function players(){
          <button class="small ${p.alive?'red':'green'}" onclick="toggleAlive(${i})">${p.alive?'Mark Dead':'Mark Alive'}</button>
          <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
          <button class="small secondary" onclick="renamePlayer(${i})">Rename</button>
-         <button class="small yellow" onclick="resetPlayerPassword(${i})">Reset Password</button>
+         <button class="small secondary" onclick="resetPlayerPassword(${i})">Reset Password</button>
          <button class="small red" onclick="rejectPlayer(${i})">Remove</button>
        </div>
      </div>`}).join(""):`<div class="notice">No approved players yet.</div>`}
@@ -2564,21 +2580,61 @@ async function rejectPlayer(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
  if(p.adminPlayer||p.id===(authUser&&authUser.user_id))return toast("You cannot remove the admin account.");
- if(!confirm("Remove "+p.name+"? This will delete their account, payment state and pick history."))return;
+
+ const choice=prompt(
+  "Remove "+p.name+"?\n\n"+
+  "Type 1 to delete the account only and KEEP Hall of Fame / winner history.\n"+
+  "Type 2 to delete the account AND remove their Hall of Fame / winner history.\n\n"+
+  "This will remove their login, device subscriptions, payment state and pick history.",
+  "1"
+ );
+ if(choice===null)return;
+
+ const cleanChoice=String(choice||"").trim();
+ if(cleanChoice!=="1"&&cleanChoice!=="2"){
+  return toast("Remove cancelled. Type 1 or 2 only.");
+ }
+ const removeHistory=cleanChoice==="2";
+
  try{
   if(onlineReady&&p.id){
-   await supabaseClient.from("push_subscriptions").delete().eq("user_id",p.id);
-   await supabaseClient.from("pick_history").delete().eq("user_id",p.id);
-   await supabaseClient.from("player_state").delete().eq("user_id",p.id);
-   const {error}=await supabaseClient.from("app_users").delete().eq("id",p.id);
-   if(error)throw error;
+   const rpc=await supabaseClient.rpc("delete_app_user_by_id",{
+    p_user_id:p.id,
+    p_remove_history:removeHistory
+   });
+
+   if(rpc.error){
+    const msg=String(rpc.error.message||"");
+    if(msg.toLowerCase().includes("delete_app_user_by_id")){
+     throw new Error("Missing Supabase delete function. Run the v92 delete_app_user_by_id SQL once.");
+    }
+    throw rpc.error;
+   }
   }
+
+  if(removeHistory){
+   state.champions=(state.champions||[]).filter(c=>c&&c.id!==p.id&&c.name!==p.name);
+  }else{
+   state.champions=(state.champions||[]).map(c=>{
+    if(c&&(c.id===p.id||c.name===p.name))return {...c,id:null,name:c.name||p.name};
+    return c;
+   });
+  }
+
   state.players.splice(i,1);
   if(window.__validSupabaseUserIds instanceof Set)window.__validSupabaseUserIds.delete(p.id);
-  addActivity("player",p.name+" removed","Player deleted by admin");
-  toast(p.name+" removed.");
-  await saveNow();
+
+  addActivity(
+   "player",
+   p.name+" removed",
+   removeHistory?"Account deleted and Hall of Fame history removed":"Account deleted; Hall of Fame history kept"
+  );
+
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  await dbSaveActivityLog();
   await syncUsersFromSupabase();
+  render();
+  toast(removeHistory?p.name+" removed with Hall of Fame history.":p.name+" account removed. Hall of Fame history kept.");
  }catch(e){
   console.error(e);
   toast("Could not remove player: "+(e.message||"unknown error"));
