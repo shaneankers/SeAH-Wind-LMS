@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v97.1 Step 4 override persistence + Step 5 Remember Me -->
+<!-- v98 launch fixes: durable Alive override, remembered username, contacts and payment details -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -932,6 +932,12 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
   rollover:"Rollover announcement: SeAH Wind LMS Competition #{competition} has rolled over. Everyone is back in, previous teams remain unavailable, and payment is due again."
  },
  contactDetails:{name:"",phone:"",message:""},
+ paymentDetails:{
+  accountName:"Shane Ankers",
+  sortCode:"60-83-71",
+  accountNumber:"83779749",
+  message:"Please use your full name as the payment reference so your payment can be identified correctly."
+ },
  teams:["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham","Leeds","Sunderland","Birmingham","Coventry","Ipswich","Leicester","Middlesbrough","Southampton"],
  leagues:{
   "Premier League":["Arsenal","Aston Villa","Bournemouth","Brentford","Brighton","Chelsea","Liverpool","Man City","Man United","Newcastle","Spurs","West Ham"],
@@ -942,6 +948,7 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  players:[],champions:[]
 };
 const AUTH_STORAGE_KEY="seah_auth_user_current";
+const REMEMBERED_USERNAME_KEY="seah_remembered_username";
 let authStorageMode=localStorage.getItem(AUTH_STORAGE_KEY)?"local":(sessionStorage.getItem(AUTH_STORAGE_KEY)?"session":null);
 
 function readStoredAuthUser(){
@@ -975,6 +982,18 @@ function clearStoredAuthUser(){
  authStorageMode=null;
  localStorage.removeItem(AUTH_STORAGE_KEY);
  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function rememberedUsername(){
+ return localStorage.getItem(REMEMBERED_USERNAME_KEY)||"";
+}
+
+function saveRememberedUsername(username,remember){
+ if(remember&&username){
+  localStorage.setItem(REMEMBERED_USERNAME_KEY,String(username));
+ }else{
+  localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+ }
 }
 
 let authUser=readStoredAuthUser(),loginMode="login",role="admin",page="dashboard",adminView=localStorage.getItem("seah_admin_view_current")||"admin";
@@ -1021,7 +1040,7 @@ function shouldQueueForNextCompetition(p){
   p&&
   competitionHasStarted()&&
   !p.adminPlayer&&
-  p.result!=="admin_override_active"&&
+  p.adminOverrideActive!==true&&
   !playerHasCompetitionHistory(p)
  );
 }
@@ -1032,6 +1051,7 @@ function queueForNextCompetition(p){
  p.locked=true;
  p.pick="";
  p.result="waiting_next_competition";
+ p.adminOverrideActive=false;
  p.outRound=null;
  p.outPick=null;
  if(!Array.isArray(p.previous))p.previous=[];
@@ -1099,7 +1119,7 @@ async function syncUsersFromSupabase(){
 
   const usersRes=await supabaseClient
    .from("app_users")
-   .select("id,username,display_name,role,approved,notifications_enabled")
+   .select("id,username,display_name,role,approved,notifications_enabled,contact_number")
    .in("role",["player","admin"])
    .order("display_name",{ascending:true});
 
@@ -1131,7 +1151,7 @@ async function syncUsersFromSupabase(){
   try{
    let stateRes=await supabaseClient
     .from("player_state")
-    .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,locked,result,previous,out_round,out_pick");
+    .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,locked,result,previous,out_round,out_pick,admin_override_active");
 
    // Some existing Supabase databases do not have the newer locked/out columns yet.
    // Fall back to the older schema instead of letting every player sync fail.
@@ -1188,6 +1208,8 @@ async function syncUsersFromSupabase(){
     previous:[],
     outRound:null,
     outPick:null,
+    adminOverrideActive:false,
+    contactNumber:u.contact_number||"",
     notifications:u.notifications_enabled!==false
    };
 
@@ -1216,6 +1238,8 @@ async function syncUsersFromSupabase(){
     previous:hasPlayerState?(Array.isArray(ps.previous)?ps.previous:[]):(Array.isArray(target.previous)?target.previous:[]),
     outRound:hasPlayerState?(ps.out_round??null):(target.outRound??null),
     outPick:hasPlayerState?(ps.out_pick??null):(target.outPick??null),
+    adminOverrideActive:hasPlayerState?(ps.admin_override_active===true):(target.adminOverrideActive===true),
+    contactNumber:u.contact_number||target.contactNumber||"",
     notifications:u.notifications_enabled!==false
    };
 
@@ -1372,7 +1396,8 @@ function renderAuth(){
   return true
  }
  app.style.display="none";login.style.display="block";
- login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" placeholder="Enter username"><label style="margin-top:12px">Password</label><input id="loginPin" type="password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" placeholder="Choose username"><label style="margin-top:12px">Password</label><input id="createPin" type="password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ const remembered=rememberedUsername();
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
 async function saveAdminAccount(){
@@ -2001,6 +2026,7 @@ function players(){
        <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
        <button class="small edit-only" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
+         <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Contact:</strong> ${escapeHtml(p.contactNumber||"Not provided")}</div>
          <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
          <button class="small ${p.alive?'red':'green'}" onclick="toggleAlive(${i})">${p.alive?'Mark Dead':'Mark Alive'}</button>
          <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
@@ -2158,11 +2184,40 @@ function contactDetailsCard(){
   </div></div>`;
 }
 
+function ensurePaymentDetails(){
+ if(!state.paymentDetails||typeof state.paymentDetails!=="object"){
+  state.paymentDetails={
+   accountName:"Shane Ankers",
+   sortCode:"60-83-71",
+   accountNumber:"83779749",
+   message:"Please use your full name as the payment reference so your payment can be identified correctly."
+  };
+ }
+ if(state.notifications&&state.notifications.paymentDetails&&typeof state.notifications.paymentDetails==="object"){
+  state.paymentDetails={...state.paymentDetails,...state.notifications.paymentDetails};
+ }
+ return state.paymentDetails;
+}
+
+function paymentDetailsCard(){
+ const p=ensurePaymentDetails();
+ return `<div class="card news-card"><div class="card-head"><strong>Payment Details</strong></div><div class="card-body">
+  <div class="admin-contact-card">
+   <div class="admin-contact-line"><span class="admin-contact-icon">👤</span><span><strong>Account Name:</strong> ${escapeHtml(p.accountName||"")}</span></div>
+   <div class="admin-contact-line"><span class="admin-contact-icon">🏦</span><span><strong>Sort Code:</strong> ${escapeHtml(p.sortCode||"")}</span></div>
+   <div class="admin-contact-line"><span class="admin-contact-icon">💳</span><span><strong>Account Number:</strong> ${escapeHtml(p.accountNumber||"")}</span></div>
+   <div class="admin-contact-note">${textToHtml(p.message||"Please use your full name as the payment reference so your payment can be identified correctly.")}</div>
+  </div>
+ </div></div>`;
+}
+
 function playerSettings(){
  const p=currentPlayer();
  const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
  return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
    <label>Display Name</label><input id="playerUsername" value="${escapeAttr(p.name||"")}">
+   <label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="playerContactNumber" inputmode="tel" value="${escapeAttr(p.contactNumber||"")}" placeholder="Example: 07...">
+   <div class="tiny" style="margin-top:6px">Strongly advised for prize money or account issues. Only the administrator can see it.</div>
    ${isAdminPlayer?`<div class="notice" style="margin-top:12px">This is also the administrator account, so password changes are managed from the admin side only.</div>`:`<label style="margin-top:12px">Password</label><input id="playerPin" type="password" value="${p.pin||""}">`}
    <br><br><button onclick="savePlayerAccount()">Save Account</button>
  </div></div>
@@ -2177,6 +2232,8 @@ function playerSettings(){
 
  ${contactDetailsCard()}
 
+ ${paymentDetailsCard()}
+
  <div class="card"><div class="card-head"><strong>Install App</strong></div><div class="card-body">
    <button class="install-button" onclick="addAppGuide()">📲 Install SêAH Wind LMS</button>
    <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install SêAH Wind LMS:</strong><br>Android/Chrome: tap <strong>Install app</strong> if shown, or open the browser menu ⋮ and choose <strong>Add to Home screen</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.<br><br>Once installed, the app will open more like a normal mobile app.</div>
@@ -2189,13 +2246,17 @@ async function savePlayerAccount(){
  if(!p)return toast("Player not found.");
  const nameEl=document.getElementById("playerUsername");
  const passEl=document.getElementById("playerPin");
+ const contactEl=document.getElementById("playerContactNumber");
  const newName=(nameEl?.value||"").trim();
  const newPass=(passEl?.value||"").trim();
+ const newContact=(contactEl?.value||"").trim();
  if(!newName)return toast("Enter a display name.");
  if(state.players.some(x=>x!==p&&(x.name||"").toLowerCase()===newName.toLowerCase()))return toast("That display name is already used.");
  const oldName=p.name;
+ const oldContact=p.contactNumber||"";
  try{
   p.name=newName;
+  p.contactNumber=newContact;
   if(state.selectedPlayer===oldName)state.selectedPlayer=newName;
   if(authUser&&authUser.user_id===p.id){
    authUser.name=newName;
@@ -2204,6 +2265,11 @@ async function savePlayerAccount(){
   if(p.id){
    const updateRes=await supabaseClient.from("app_users").update({display_name:newName}).eq("id",p.id);
    if(updateRes.error)throw updateRes.error;
+   const contactRes=await supabaseClient.rpc("set_player_contact_number",{
+    p_user_id:p.id,
+    p_contact_number:newContact
+   });
+   if(contactRes.error)throw contactRes.error;
   }
   if(newPass){
    if(newPass.length<4)return toast("Password must be at least 4 characters.");
@@ -2217,6 +2283,7 @@ async function savePlayerAccount(){
  }catch(e){
   console.error("Account save failed",e);
   p.name=oldName;
+  p.contactNumber=oldContact;
   if(state.selectedPlayer===newName)state.selectedPlayer=oldName;
   toast("Could not save account: "+(e.message||"unknown error"));
   await syncUsersFromSupabase();
@@ -2576,6 +2643,16 @@ function settings(){
   <br><br><button onclick="saveContactDetails()">Save Contact Details</button>
  </div></div>
 
+ <div class="card"><div class="card-head"><strong>Player Payment Details</strong></div><div class="card-body">
+  <div class="formrow">
+   <div><label>Account name</label><input id="paymentAccountName" value="${escapeAttr(ensurePaymentDetails().accountName||"")}"></div>
+   <div><label>Sort code</label><input id="paymentSortCode" value="${escapeAttr(ensurePaymentDetails().sortCode||"")}"></div>
+  </div>
+  <label>Account number</label><input id="paymentAccountNumber" value="${escapeAttr(ensurePaymentDetails().accountNumber||"")}">
+  <label style="margin-top:12px">Payment message</label><textarea id="paymentMessage" rows="3">${escapeHtml(ensurePaymentDetails().message||"Please use your full name as the payment reference so your payment can be identified correctly.")}</textarea>
+  <br><br><button onclick="savePaymentDetails()">Save Payment Details</button>
+ </div></div>
+
  <div class="card"><div class="card-head"><strong>Competition Rules</strong></div><div class="card-body">
   <div class="formrow">
    <div><label>Entry fee</label><input id="entryFee" type="number" value="${escapeHtml(state.entryFee)}"></div>
@@ -2798,9 +2875,8 @@ async function togglePaid(i){
 
  p.paid=!p.paid;
 
- // Once an admin-overridden player is marked paid, they are now a normal active
- // entrant and must be included in normal pending-pick/round checks.
- if(p.paid&&p.result==="admin_override_active"){
+ // An explicitly admitted late player remains active when payment is updated.
+ if(p.paid&&p.adminOverrideActive===true){
   p.result="pending";
   p.alive=true;
   p.locked=false;
@@ -2835,10 +2911,10 @@ async function toggleAlive(i){
   p.pick="";
   p.locked=false;
 
-  // Remember that the admin deliberately allowed this new player into a live
-  // competition. Without this marker, the next 15-second Supabase refresh sees
-  // "no competition history" and automatically queues them again.
-  p.result=competitionHasStarted()?"admin_override_active":"pending";
+  // Persist the administrator's decision in its own Supabase field.
+  // Match result remains a normal "pending" value.
+  p.result="pending";
+  p.adminOverrideActive=competitionHasStarted();
 
   addActivity(
    "player",
@@ -2850,6 +2926,7 @@ async function toggleAlive(i){
    (p.paid?"":" Mark them as paid when they are ready to enter.")
   );
  }else{
+  p.adminOverrideActive=false;
   p.outRound=state.round;
   p.outPick=p.pick||p.outPick||null;
   p.result="lose";
@@ -3075,6 +3152,7 @@ async function startNextCompetition(){
   p.pick="";
   p.locked=false;
   p.result="pending";
+  p.adminOverrideActive=false;
   p.previous=[];
   p.outRound=null;
   p.outPick=null;
@@ -3228,6 +3306,30 @@ async function saveContactDetails(){
  }catch(e){
   console.error("Contact details save failed",e);
   toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
+ }
+ render();
+}
+
+async function savePaymentDetails(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const accountName=(document.getElementById("paymentAccountName")?.value||"").trim();
+ const sortCode=(document.getElementById("paymentSortCode")?.value||"").trim();
+ const accountNumber=(document.getElementById("paymentAccountNumber")?.value||"").trim();
+ const message=(document.getElementById("paymentMessage")?.value||"").trim();
+ if(!accountName||!sortCode||!accountNumber)return toast("Enter all bank account details.");
+
+ state.paymentDetails={accountName,sortCode,accountNumber,message};
+ if(!state.notifications||typeof state.notifications!=="object")state.notifications={};
+ state.notifications.paymentDetails=state.paymentDetails;
+ localStorage.setItem(storeKey,JSON.stringify(state));
+
+ try{
+  await dbSaveSettings();
+  await loadAppSettingsFromSupabase();
+  toast("Payment details saved.");
+ }catch(e){
+  console.error("Payment details save failed",e);
+  toast("Payment details did not save: "+(e.message||"check Supabase"));
  }
  render();
 }
@@ -3421,7 +3523,8 @@ async function dbUpsertPlayer(p){
   username:p.username||p.name,
   role:p.adminPlayer?"admin":(p.role||"player"),
   approved:!!p.approved,
-  notifications_enabled:p.notifications!==false
+  notifications_enabled:p.notifications!==false,
+  contact_number:p.contactNumber||null
  };
  const userRes=await supabaseClient.from("app_users").update(userUpdate).eq("id",p.id);
  if(userRes.error)throw userRes.error;
@@ -3440,11 +3543,12 @@ async function dbUpsertPlayer(p){
   previous:Array.isArray(p.previous)?p.previous:[],
   out_round:p.outRound??null,
   out_pick:p.outPick??null,
+  admin_override_active:p.adminOverrideActive===true,
   updated_at:new Date().toISOString()
  };
  const attempts=[
   stateRow,
-  {user_id:stateRow.user_id,competition_number:stateRow.competition_number,rollover_number:stateRow.rollover_number,round_number:stateRow.round_number,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,result:stateRow.result,previous:stateRow.previous,updated_at:stateRow.updated_at},
+  {user_id:stateRow.user_id,competition_number:stateRow.competition_number,rollover_number:stateRow.rollover_number,round_number:stateRow.round_number,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,result:stateRow.result,previous:stateRow.previous,admin_override_active:stateRow.admin_override_active,updated_at:stateRow.updated_at},
   {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick,result:stateRow.result,previous:stateRow.previous},
   {user_id:stateRow.user_id,paid:stateRow.paid,alive:stateRow.alive,wins:stateRow.wins,pick:stateRow.pick}
  ];
@@ -3680,6 +3784,7 @@ async function loginUser(){
   authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
   storeAuthUser(authUser,remember);
+  saveRememberedUsername(u.username||name,remember);
   if(u.role==="admin"){
    adminView="admin";
    localStorage.setItem("seah_admin_view_current",adminView);
@@ -3736,6 +3841,7 @@ async function createAccount(){
  const pin=document.getElementById("createPin").value.trim();
  const confirmPin=document.getElementById("createPinConfirm").value.trim();
  const code=document.getElementById("joinCode").value.trim();
+ const contactNumber=(document.getElementById("createContactNumber")?.value||"").trim();
  const remember=document.getElementById("createRemember").checked;
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
@@ -3784,6 +3890,16 @@ async function createAccount(){
   // New accounts start with notifications enabled in the app database.
   // Device/browser permission is handled separately by the native prompt.
   storeAuthUser(authUser,remember);
+  saveRememberedUsername(u.username||name,remember);
+
+  if(contactNumber){
+   const contactRes=await supabaseClient.rpc("set_player_contact_number",{
+    p_user_id:u.user_id,
+    p_contact_number:contactNumber
+   });
+   if(contactRes.error)throw contactRes.error;
+  }
+
   await forceEnableNotificationsForLoggedInUser();
 
   await loadAppSettingsFromSupabase();
@@ -3809,7 +3925,9 @@ async function createAccount(){
     previous:[],
     outRound:null,
     outPick:null,
-    notifications:true
+    notifications:true,
+    contactNumber:contactNumber,
+    adminOverrideActive:false
    };
    state.players.push(p);
   }
@@ -3878,6 +3996,7 @@ async function loadAppSettingsFromSupabase(){
   if(data.notifications&&typeof data.notifications==="object"){
    state.notifications=data.notifications;
    if(data.notifications.contactDetails&&typeof data.notifications.contactDetails==="object")state.contactDetails=data.notifications.contactDetails;
+   if(data.notifications.paymentDetails&&typeof data.notifications.paymentDetails==="object")state.paymentDetails=data.notifications.paymentDetails;
   }
   if(typeof data.announcement!=="undefined"&&data.announcement!==null)state.announcement=data.announcement;
   if(typeof data.announcement_version!=="undefined"&&data.announcement_version!==null)state.announcementVersion=Number(data.announcement_version)||0;
