@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v95 Step 3 safe account deletion and preserved Hall of Fame -->
+<!-- v96 Step 4 admin alive override warning -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -2759,14 +2759,38 @@ async function togglePaid(i){
 async function toggleAlive(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
- if(isQueuedForNextCompetition(p)&&competitionHasStarted())return toast(p.name+" is queued for the next competition and cannot be made active in this one.");
- p.alive=!p.alive;
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+
+ const makingAlive=!p.alive;
+
+ if(makingAlive&&competitionHasStarted()){
+  const confirmed=confirm(
+   "This competition is already in progress.\n\n"+
+   "Are you sure you want to set "+p.name+" to Alive?\n\n"+
+   "Use this only to correct an administrative mistake or resolve a player technical issue. "+
+   "The player will remain unpaid until you separately mark them as paid."
+  );
+  if(!confirmed)return;
+ }
+
+ p.alive=makingAlive;
+
  if(p.alive){
   p.outRound=null;
   p.outPick=null;
-  if(!p.result||p.result==="lose")p.result="pending";
-  addActivity("player",p.name+" marked alive","Manual admin correction");
-  toast(p.name+" marked alive.");
+  p.pick="";
+  p.locked=false;
+  p.result="pending";
+
+  addActivity(
+   "player",
+   p.name+" marked alive",
+   competitionHasStarted()?"Admin override during active competition":"Manual admin correction"
+  );
+  toast(
+   p.name+" marked alive."+
+   (p.paid?"":" Mark them as paid when they are ready to enter.")
+  );
  }else{
   p.outRound=state.round;
   p.outPick=p.pick||p.outPick||null;
@@ -2774,6 +2798,7 @@ async function toggleAlive(i){
   addActivity("player",p.name+" marked dead","Manual admin correction");
   toast(p.name+" marked dead.");
  }
+
  await saveNow();
 }
 async function unlockPick(i){
