@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v94 Step 2 correct winner notification payload -->
+<!-- v94.2 Step 2 winner confirmation with admin override -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -877,6 +877,28 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
     <div class="actions" style="margin-top:12px">
       <button onclick="saveRenamePlayer()">Save</button>
       <button class="secondary" onclick="closeRenameModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="winnerNotifyModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.72);align-items:center;justify-content:center;padding:18px;z-index:90">
+  <div style="background:white;border-radius:22px;max-width:460px;width:100%;padding:20px;box-shadow:var(--shadow)">
+    <h3 style="margin:0 0 8px">Send Winner Notification</h3>
+    <div class="muted" style="margin-bottom:16px">Review the details before sending this notification to all registered participants.</div>
+
+    <div class="notice" style="margin-bottom:14px">
+      <div><strong>Competition:</strong> <span id="winnerNotifyCompetition"></span></div>
+      <div style="margin-top:7px"><strong>Winner:</strong> <span id="winnerNotifyName"></span></div>
+    </div>
+
+    <div id="winnerChangePanel" style="display:none;margin-bottom:14px">
+      <label>Choose a different winner</label>
+      <select id="winnerNotifySelect" onchange="previewWinnerNotificationChange(this.value)"></select>
+    </div>
+
+    <div class="actions">
+      <button class="green" onclick="sendConfirmedWinnerNotification()">Send Notification</button>
+      <button class="secondary" onclick="showWinnerChangePanel()">Change Winner</button>
+      <button class="ghost" onclick="closeWinnerNotifyModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -1762,20 +1784,84 @@ function notifyMissingPicks(){
  return notifyGroup("missingPick",targets,noteText("missingPick"));
 }
 
-function notifyWinner(){
+let pendingWinnerNotification=null;
+
+function winnerNotificationCandidates(){
+ return (state.players||[])
+  .filter(p=>p&&p.approved&&!p.adminPlayer)
+  .slice()
+  .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),undefined,{sensitivity:"base"}));
+}
+
+function openWinnerNotifyModal(winner,competition,rollover){
+ const modal=document.getElementById("winnerNotifyModal");
+ const nameEl=document.getElementById("winnerNotifyName");
+ const compEl=document.getElementById("winnerNotifyCompetition");
+ const selectEl=document.getElementById("winnerNotifySelect");
+ const changePanel=document.getElementById("winnerChangePanel");
+ if(!modal||!nameEl||!compEl||!selectEl||!changePanel)return toast("Winner confirmation could not be opened.");
+
+ pendingWinnerNotification={
+  winner:String(winner||"").trim(),
+  competition:Number(competition||1),
+  rollover:Number(rollover||0)
+ };
+
+ nameEl.textContent=pendingWinnerNotification.winner;
+ compEl.textContent=String(pendingWinnerNotification.competition);
+ changePanel.style.display="none";
+
+ const candidates=winnerNotificationCandidates();
+ selectEl.innerHTML=candidates.map(p=>
+  `<option value="${escapeAttr(p.name)}" ${p.name===pendingWinnerNotification.winner?"selected":""}>${escapeHtml(p.name)}</option>`
+ ).join("");
+
+ modal.style.display="flex";
+}
+
+function showWinnerChangePanel(){
+ const panel=document.getElementById("winnerChangePanel");
+ if(panel)panel.style.display="block";
+}
+
+function previewWinnerNotificationChange(name){
+ if(!pendingWinnerNotification)return;
+ pendingWinnerNotification.winner=String(name||"").trim();
+ const nameEl=document.getElementById("winnerNotifyName");
+ if(nameEl)nameEl.textContent=pendingWinnerNotification.winner;
+}
+
+function closeWinnerNotifyModal(){
+ const modal=document.getElementById("winnerNotifyModal");
+ if(modal)modal.style.display="none";
+ pendingWinnerNotification=null;
+}
+
+async function sendConfirmedWinnerNotification(){
+ if(!pendingWinnerNotification)return toast("Winner notification details are missing.");
+
+ const {winner,competition,rollover}=pendingWinnerNotification;
+ if(!winner)return toast("Choose a winner first.");
+
  const targets=announcementTargets("winner");
- const winner=defendingChampion();
- if(!winner||winner==="None")return toast("No competition winner has been recorded yet.");
+ closeWinnerNotifyModal();
+
  return notifyGroup(
   "winner",
   targets,
   noteText("winner",{winner}),
-  {
-   winner,
-   competition:Number(state.competition||1),
-   rollover:Number(state.rollover||0)
-  }
+  {winner,competition,rollover}
  );
+}
+
+function notifyWinner(){
+ const winner=defendingChampion();
+ const competition=Number(state.competition||1);
+ const rollover=Number(state.rollover||0);
+
+ if(!winner||winner==="None")return toast("No competition winner has been recorded yet.");
+
+ openWinnerNotifyModal(winner,competition,rollover);
 }
 
 function notifyRollover(){
