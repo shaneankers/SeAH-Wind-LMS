@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v96 Step 4 admin alive override warning -->
+<!-- v97.1 Step 4 override persistence + Step 5 Remember Me -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -941,7 +941,43 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
  },
  players:[],champions:[]
 };
-let authUser=JSON.parse(localStorage.getItem("seah_auth_user_current")||"null"),loginMode="login",role="admin",page="dashboard",adminView=localStorage.getItem("seah_admin_view_current")||"admin";
+const AUTH_STORAGE_KEY="seah_auth_user_current";
+let authStorageMode=localStorage.getItem(AUTH_STORAGE_KEY)?"local":(sessionStorage.getItem(AUTH_STORAGE_KEY)?"session":null);
+
+function readStoredAuthUser(){
+ try{
+  const saved=localStorage.getItem(AUTH_STORAGE_KEY)||sessionStorage.getItem(AUTH_STORAGE_KEY);
+  return saved?JSON.parse(saved):null;
+ }catch(e){
+  console.warn("Could not read saved login",e);
+  return null;
+ }
+}
+
+function storeAuthUser(user,remember){
+ authStorageMode=remember?"local":"session";
+ const value=JSON.stringify(user);
+ if(remember){
+  localStorage.setItem(AUTH_STORAGE_KEY,value);
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+ }else{
+  sessionStorage.setItem(AUTH_STORAGE_KEY,value);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+ }
+}
+
+function persistCurrentAuth(){
+ if(!authUser)return;
+ storeAuthUser(authUser,authStorageMode!=="session");
+}
+
+function clearStoredAuthUser(){
+ authStorageMode=null;
+ localStorage.removeItem(AUTH_STORAGE_KEY);
+ sessionStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+let authUser=readStoredAuthUser(),loginMode="login",role="admin",page="dashboard",adminView=localStorage.getItem("seah_admin_view_current")||"admin";
 function save(){localStorage.setItem(storeKey,JSON.stringify(state));render()}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]||ch));}
@@ -981,7 +1017,13 @@ function playerHasCompetitionHistory(p){
  );
 }
 function shouldQueueForNextCompetition(p){
- return !!(p&&competitionHasStarted()&&!p.adminPlayer&&!playerHasCompetitionHistory(p));
+ return !!(
+  p&&
+  competitionHasStarted()&&
+  !p.adminPlayer&&
+  p.result!=="admin_override_active"&&
+  !playerHasCompetitionHistory(p)
+ );
 }
 function queueForNextCompetition(p){
  if(!p)return p;
@@ -1078,7 +1120,8 @@ async function syncUsersFromSupabase(){
   // If this device is still logged in as a deleted account, clear the stale login.
   if(authUser&&authUser.user_id&&!validUserIds.has(authUser.user_id)){
    authUser=null;
-   localStorage.removeItem("seah_auth_user_current");
+   currentUserId=null;
+   clearStoredAuthUser();
    localStorage.setItem(storeKey,JSON.stringify(state));
    setTimeout(()=>renderAuth(),0);
    return true;
@@ -1397,7 +1440,7 @@ async function saveAdminAccount(){
   authUser.username=username;
   authUser.name=username;
   authUser.must_reset_password=false;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  persistCurrentAuth();
 
   const adminPlayer=state.players.find(p=>p.id===authUser.user_id||p.adminPlayer===true||p.username===oldUsername||p.name===oldName);
   if(adminPlayer){
@@ -1448,7 +1491,7 @@ async function completeForcedPasswordReset(){
   }
 
   authUser.must_reset_password=false;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  persistCurrentAuth();
   toast("Password updated.");
   render();
  }catch(e){
@@ -1457,7 +1500,7 @@ async function completeForcedPasswordReset(){
  }
 }
 
-function logout(){authUser=null;localStorage.removeItem("seah_auth_user_current");page="dashboard";renderAuth()}
+function logout(){authUser=null;currentUserId=null;clearStoredAuthUser();page="dashboard";renderAuth()}
 function ensureAdminPlayer(){
  let p=(authUser&&authUser.user_id)?state.players.find(x=>x.id===authUser.user_id):null;
  if(!p) p=state.players.find(x=>x.adminPlayer===true);
@@ -2156,7 +2199,7 @@ async function savePlayerAccount(){
   if(state.selectedPlayer===oldName)state.selectedPlayer=newName;
   if(authUser&&authUser.user_id===p.id){
    authUser.name=newName;
-   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+   persistCurrentAuth();
   }
   if(p.id){
    const updateRes=await supabaseClient.from("app_users").update({display_name:newName}).eq("id",p.id);
@@ -2284,7 +2327,7 @@ async function ensurePushRegistered(canPrompt){
 async function forceEnableNotificationsForLoggedInUser(){
  if(!authUser||!authUser.user_id||!supabaseClient)return false;
  authUser.notifications_enabled=true;
- localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+ persistCurrentAuth();
  const p=state.players.find(x=>x.id===authUser.user_id);
  if(p)p.notifications=true;
  try{
@@ -2419,7 +2462,7 @@ async function togglePlayerNotifications(){
   p.notifications=!!savedValue;
   if(authUser){
    authUser.notifications_enabled=p.notifications;
-   localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+   persistCurrentAuth();
   }
 
   toast(p.notifications?"Notifications enabled on this device.":"Notifications turned off.");
@@ -2744,6 +2787,7 @@ async function rejectPlayer(i){
 async function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
+
  if(!p.paid&&shouldQueueForNextCompetition(p)){
   queueForNextCompetition(p);
   addActivity("player",p.name+" queued for next competition","Payment blocked because current competition has already started");
@@ -2751,7 +2795,17 @@ async function togglePaid(i){
   await saveNow();
   return;
  }
+
  p.paid=!p.paid;
+
+ // Once an admin-overridden player is marked paid, they are now a normal active
+ // entrant and must be included in normal pending-pick/round checks.
+ if(p.paid&&p.result==="admin_override_active"){
+  p.result="pending";
+  p.alive=true;
+  p.locked=false;
+ }
+
  addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status updated");
  toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
  await saveNow();
@@ -2780,7 +2834,11 @@ async function toggleAlive(i){
   p.outPick=null;
   p.pick="";
   p.locked=false;
-  p.result="pending";
+
+  // Remember that the admin deliberately allowed this new player into a live
+  // competition. Without this marker, the next 15-second Supabase refresh sees
+  // "no competition history" and automatically queues them again.
+  p.result=competitionHasStarted()?"admin_override_active":"pending";
 
   addActivity(
    "player",
@@ -2843,7 +2901,7 @@ async function saveRenamePlayer(){
  if(state.selectedPlayer===oldName)state.selectedPlayer=newName;
  if(authUser&&authUser.role==="player"&&authUser.name===oldName){
   authUser.name=newName;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  persistCurrentAuth();
  }
  closeRenameModal();
  toast(oldName+" renamed to "+newName+".");
@@ -3621,7 +3679,7 @@ async function loginUser(){
  try{
   authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
-  if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  storeAuthUser(authUser,remember);
   if(u.role==="admin"){
    adminView="admin";
    localStorage.setItem("seah_admin_view_current",adminView);
@@ -3656,7 +3714,7 @@ async function loginAdmin(){
   if(!data||!data.length||data[0].role!=="admin")return toast("Incorrect admin login.");
   authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id,must_reset_password:!!data[0].must_reset_password,notifications_enabled:data[0].notifications_enabled===false?false:true};
   currentUserId=data[0].user_id;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  storeAuthUser(authUser,true);
   await loadAppSettingsFromSupabase();
   await loadAnnouncementDismissalsForUser();
   adminView="admin";
@@ -3725,7 +3783,7 @@ async function createAccount(){
 
   // New accounts start with notifications enabled in the app database.
   // Device/browser permission is handled separately by the native prompt.
-  if(remember)localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  storeAuthUser(authUser,remember);
   await forceEnableNotificationsForLoggedInUser();
 
   await loadAppSettingsFromSupabase();
@@ -3761,7 +3819,7 @@ async function createAccount(){
   const createdPlayer=state.players.find(x=>x.id===authUser.user_id);
   if(createdPlayer)createdPlayer.notifications=true;
   authUser.notifications_enabled=true;
-  localStorage.setItem("seah_auth_user_current",JSON.stringify(authUser));
+  persistCurrentAuth();
   localStorage.setItem(storeKey,JSON.stringify(state));
   await ensurePushRegistered(false);
   render();
@@ -3841,10 +3899,7 @@ async function loadAppSettingsFromSupabase(){
 }
 
 async function boot(){
- const saved=localStorage.getItem("seah_auth_user_current");
- if(saved){
-  try{authUser=JSON.parse(saved);currentUserId=authUser.user_id||null;}catch(e){}
- }
+ if(authUser)currentUserId=authUser.user_id||null;
 
  // The Supabase client is available even before a login. Previous builds never set
  // onlineReady=true, so Settings buttons and Factory Reset silently saved only locally.
