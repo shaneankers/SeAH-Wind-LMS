@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v92 safe account removal + admin button tidy -->
+<!-- v93 Step 1 atomic player pick submission fix -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -2756,28 +2756,48 @@ function chooseTempPick(v){window.tempPick=v;render()}
 async function confirmPlayerPick(){
  const p=currentPlayer();
  const pick=(window.tempPick||"").trim();
- if(isQueuedForNextCompetition(p))return toast("You cannot pick until the next competition starts.");
- if(!p.alive)return toast("You are not active in the current competition.");
- if(!p.paid)return toast("You cannot submit a pick until your payment has been marked as paid.");
- if(!pick){
-  p.locked=false;
-  return toast("Choose a team first.");
- }
+
+ if(!p||!p.id)return toast("Could not identify the logged-in player.");
+ if(!pick)return toast("Choose a team first.");
  if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
- const oldPick=p.pick;
- const oldLocked=p.locked;
- p.pick=pick;
- p.locked=true;
- addActivity("pick",p.name+" picked "+pick,"Round "+state.round+" pick submitted");
- window.tempPick="";
+
  try{
-  await saveNow();
-  toast("Pick submitted and locked.");
- }catch(e){
-  p.pick=oldPick;
-  p.locked=oldLocked;
+  if(!supabaseClient)throw new Error("Supabase is not available.");
+
+  // v93 Step 1: Supabase checks the CURRENT paid/alive/approved state and
+  // updates only the pick fields. A stale device cannot restore paid=true.
+  const {data,error}=await supabaseClient.rpc("submit_player_pick",{
+   p_user_id:p.id,
+   p_pick:pick
+  });
+  if(error)throw error;
+
+  const saved=Array.isArray(data)?data[0]:data;
+  if(!saved||saved.success!==true)throw new Error(saved?.message||"The pick was not accepted.");
+
+  p.pick=saved.pick||pick;
+  p.locked=true;
+  p.paid=saved.paid===true;
+  p.alive=saved.alive!==false;
+  p.result=saved.result||"pending";
+  window.tempPick="";
+
+  addActivity("pick",p.name+" picked "+p.pick,"Round "+state.round+" pick submitted");
+  localStorage.setItem(storeKey,JSON.stringify(state));
+
+  // Save Latest News only. Do not call saveNow()/dbUpsertPlayer here because
+  // those functions write cached paid/alive values back to player_state.
+  await dbSaveActivityLog();
+  await syncUsersFromSupabase();
   localStorage.setItem(storeKey,JSON.stringify(state));
   render();
+  toast("Pick submitted and locked.");
+ }catch(e){
+  console.error("Pick submission failed",e);
+  await syncUsersFromSupabase();
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  toast(e.message||"Pick could not be submitted.");
  }
 }
 async function processRound(){
