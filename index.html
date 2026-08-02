@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v99 subtle interface tap sound with per-device toggle -->
+<!-- v100 display-name login warning and admin username visibility -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -2076,6 +2076,8 @@ function players(){
        <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
        <button class="small edit-only" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
+         <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Login username:</strong> ${escapeHtml(p.username||"Not available")}</div>
+         <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Display name:</strong> ${escapeHtml(p.name||"Not available")}</div>
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Contact:</strong> ${escapeHtml(p.contactNumber||"Not provided")}</div>
          <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
          <button class="small ${p.alive?'red':'green'}" onclick="toggleAlive(${i})">${p.alive?'Mark Dead':'Mark Alive'}</button>
@@ -2266,6 +2268,9 @@ function playerSettings(){
  const isAdminPlayer=authUser&&authUser.role==="admin"&&(p.adminPlayer||p.id===authUser.user_id);
  return `<div class="card"><div class="card-head"><strong>Account</strong></div><div class="card-body">
    <label>Display Name</label><input id="playerUsername" value="${escapeAttr(p.name||"")}">
+   <div class="tiny" style="margin-top:6px;line-height:1.45">
+    Please remember your username before changing your display name. Your display name is not your login username, so you must continue to log in using your original username.
+   </div>
    <label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="playerContactNumber" inputmode="tel" value="${escapeAttr(p.contactNumber||"")}" placeholder="Example: 07...">
    <div class="tiny" style="margin-top:6px">Strongly advised for prize money or account issues. Only the administrator can see it.</div>
    ${isAdminPlayer?`<div class="notice" style="margin-top:12px">This is also the administrator account, so password changes are managed from the admin side only.</div>`:`<label style="margin-top:12px">Password</label><input id="playerPin" type="password" value="${p.pin||""}">`}
