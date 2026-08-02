@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v94.2 Step 2 winner confirmation with admin override -->
+<!-- v95 Step 3 safe account deletion and preserved Hall of Fame -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -2682,9 +2682,9 @@ async function rejectPlayer(i){
 
  const choice=prompt(
   "Remove "+p.name+"?\n\n"+
-  "Type 1 to delete the account only and KEEP Hall of Fame / winner history.\n"+
-  "Type 2 to delete the account AND remove their Hall of Fame / winner history.\n\n"+
-  "This will remove their login, device subscriptions, payment state and pick history.",
+  "Type 1 to delete the account and KEEP their name in Hall of Fame.\n"+
+  "Type 2 to delete the account and change their Hall of Fame name to Removed Player.\n\n"+
+  "Both options remove their login, device subscriptions, payment state and pick history. Competition winner entries will not be deleted.",
   "1"
  );
  if(choice===null)return;
@@ -2711,14 +2711,16 @@ async function rejectPlayer(i){
    }
   }
 
-  if(removeHistory){
-   state.champions=(state.champions||[]).filter(c=>c&&c.id!==p.id&&c.name!==p.name);
-  }else{
-   state.champions=(state.champions||[]).map(c=>{
-    if(c&&(c.id===p.id||c.name===p.name))return {...c,id:null,name:c.name||p.name};
-    return c;
-   });
-  }
+  state.champions=(state.champions||[]).map(c=>{
+   if(c&&(c.id===p.id||c.name===p.name)){
+    return {
+     ...c,
+     id:null,
+     name:removeHistory?"Removed Player":(c.name||p.name)
+    };
+   }
+   return c;
+  });
 
   state.players.splice(i,1);
   if(window.__validSupabaseUserIds instanceof Set)window.__validSupabaseUserIds.delete(p.id);
@@ -2726,14 +2728,14 @@ async function rejectPlayer(i){
   addActivity(
    "player",
    p.name+" removed",
-   removeHistory?"Account deleted and Hall of Fame history removed":"Account deleted; Hall of Fame history kept"
+   removeHistory?"Account deleted; Hall of Fame entry anonymised as Removed Player":"Account deleted; Hall of Fame name kept"
   );
 
   localStorage.setItem(storeKey,JSON.stringify(state));
   await dbSaveActivityLog();
   await syncUsersFromSupabase();
   render();
-  toast(removeHistory?p.name+" removed with Hall of Fame history.":p.name+" account removed. Hall of Fame history kept.");
+  toast(removeHistory?p.name+" account removed. Hall of Fame now shows Removed Player.":p.name+" account removed. Hall of Fame name kept.");
  }catch(e){
   console.error(e);
   toast("Could not remove player: "+(e.message||"unknown error"));
@@ -3379,6 +3381,7 @@ async function saveChampionRecord(c){
  if(!p||!p.id)return false;
  const row={
   user_id:p.id,
+  display_name:c.name||p.name,
   competition_number:Number(c.comp||state.competition),
   rollover_number:Number(c.rollover||0)
  };
@@ -3399,7 +3402,7 @@ async function loadChampionRecords(){
   if(!onlineReady)setOnlineStatus(true,"Database connected");
   const {data,error}=await supabaseClient
    .from("champions")
-   .select("user_id,competition_number,rollover_number")
+   .select("user_id,display_name,competition_number,rollover_number")
    .order("competition_number",{ascending:true});
   if(error)throw error;
   const rows=Array.isArray(data)?data:[];
@@ -3407,7 +3410,7 @@ async function loadChampionRecords(){
    const p=state.players.find(x=>x.id===r.user_id);
    return {
     id:r.user_id,
-    name:p?p.name:"Winner",
+    name:(r.display_name||p?.name||"Removed Player"),
     comp:Number(r.competition_number||1),
     rollover:Number(r.rollover_number||0)
    };
@@ -3429,13 +3432,13 @@ async function dbSaveChampions(){
  const seen=new Set();
  const rows=(state.champions||[]).map(c=>{
   const p=state.players.find(x=>x.id===c.id||x.name===c.name);
-  if(!p||!p.id)return null;
   const row={
-   user_id:p.id,
+   user_id:p?.id||c.id||null,
+   display_name:c.name||(p?p.name:"Removed Player"),
    competition_number:Number(c.comp||state.competition),
    rollover_number:Number(c.rollover||0)
   };
-  const key=row.user_id+"|"+row.competition_number+"|"+row.rollover_number;
+  const key=(row.user_id||row.display_name)+"|"+row.competition_number+"|"+row.rollover_number;
   if(seen.has(key))return null;
   seen.add(key);
   return row;
