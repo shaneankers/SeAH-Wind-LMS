@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v93 Step 1 atomic player pick submission fix -->
+<!-- v94 Step 2 correct winner notification payload -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1703,7 +1703,7 @@ async function notificationMessageFromSettings(type){
  return msg;
 }
 
-async function notifyGroup(type,targets,message){
+async function notifyGroup(type,targets,message,templateData={}){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
 
  // The Edge Function now reads the correct notification template from Supabase
@@ -1721,7 +1721,10 @@ async function notifyGroup(type,targets,message){
   // browser/CORS/header differences between the app button and the Supabase
   // dashboard test. The Edge Function reads Settings and recipients itself.
   const {data:json,error:fnError}=await supabaseClient.functions.invoke("push-notifications",{
-   body:{type:notificationType}
+   body:{
+    type:notificationType,
+    ...templateData
+   }
   });
   if(fnError)throw fnError;
   pushed=!!(json&&json.success===true&&Number(json.sent||0)>0);
@@ -1762,7 +1765,17 @@ function notifyMissingPicks(){
 function notifyWinner(){
  const targets=announcementTargets("winner");
  const winner=defendingChampion();
- return notifyGroup("winner",targets,noteText("winner",{winner}));
+ if(!winner||winner==="None")return toast("No competition winner has been recorded yet.");
+ return notifyGroup(
+  "winner",
+  targets,
+  noteText("winner",{winner}),
+  {
+   winner,
+   competition:Number(state.competition||1),
+   rollover:Number(state.rollover||0)
+  }
+ );
 }
 
 function notifyRollover(){
