@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v98 launch fixes: durable Alive override, remembered username, contacts and payment details -->
+<!-- v99 subtle interface tap sound with per-device toggle -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -949,6 +949,56 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
 };
 const AUTH_STORAGE_KEY="seah_auth_user_current";
 const REMEMBERED_USERNAME_KEY="seah_remembered_username";
+const SOUND_EFFECTS_KEY="seah_sound_effects_enabled";
+
+function soundEffectsEnabled(){
+ const saved=localStorage.getItem(SOUND_EFFECTS_KEY);
+ return saved===null?true:saved==="true";
+}
+
+function setSoundEffectsEnabled(enabled){
+ localStorage.setItem(SOUND_EFFECTS_KEY,enabled?"true":"false");
+}
+
+let tapAudioContext=null;
+
+function playTapSound(){
+ if(!soundEffectsEnabled())return;
+
+ try{
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass)return;
+
+  if(!tapAudioContext)tapAudioContext=new AudioContextClass();
+  if(tapAudioContext.state==="suspended")tapAudioContext.resume();
+
+  const now=tapAudioContext.currentTime;
+  const oscillator=tapAudioContext.createOscillator();
+  const gain=tapAudioContext.createGain();
+
+  oscillator.type="sine";
+  oscillator.frequency.setValueAtTime(520,now);
+  oscillator.frequency.exponentialRampToValueAtTime(310,now+0.035);
+
+  gain.gain.setValueAtTime(0.0001,now);
+  gain.gain.exponentialRampToValueAtTime(0.055,now+0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001,now+0.045);
+
+  oscillator.connect(gain);
+  gain.connect(tapAudioContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now+0.05);
+ }catch(e){
+  console.warn("Tap sound skipped",e);
+ }
+}
+
+function toggleSoundEffects(){
+ const enabled=!soundEffectsEnabled();
+ setSoundEffectsEnabled(enabled);
+ render();
+ toast(enabled?"Sound effects enabled.":"Sound effects disabled.");
+}
 let authStorageMode=localStorage.getItem(AUTH_STORAGE_KEY)?"local":(sessionStorage.getItem(AUTH_STORAGE_KEY)?"session":null);
 
 function readStoredAuthUser(){
@@ -2220,6 +2270,17 @@ function playerSettings(){
    <div class="tiny" style="margin-top:6px">Strongly advised for prize money or account issues. Only the administrator can see it.</div>
    ${isAdminPlayer?`<div class="notice" style="margin-top:12px">This is also the administrator account, so password changes are managed from the admin side only.</div>`:`<label style="margin-top:12px">Password</label><input id="playerPin" type="password" value="${p.pin||""}">`}
    <br><br><button onclick="savePlayerAccount()">Save Account</button>
+ </div></div>
+
+ <div class="card"><div class="card-head"><strong>Sound Effects</strong></div><div class="card-body">
+   <div class="item">
+     <div>
+       <div class="item-title">Interface Tap Sound</div>
+       <div class="tiny">${soundEffectsEnabled()?"Enabled":"Disabled"} on this device</div>
+     </div>
+     <button class="small ${soundEffectsEnabled()?"green":"red"}" onclick="toggleSoundEffects()">${soundEffectsEnabled()?"On":"Off"}</button>
+   </div>
+   <div class="tiny" style="margin-top:10px">Plays a short, quiet tap when buttons and controls are pressed.</div>
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Notifications</strong></div><div class="card-body">
@@ -4050,6 +4111,7 @@ if("serviceWorker" in navigator){
 window.rules=rules;
 window.settings=settings;
 window.playerSettings=playerSettings;
+window.toggleSoundEffects=toggleSoundEffects;
 window.savePlayerAccount=savePlayerAccount;
 window.saveSettings=saveSettings;
 window.saveAnnouncementAndDisclaimer=saveAnnouncementAndDisclaimer;
@@ -4086,6 +4148,14 @@ async function refreshSharedState(){
 setInterval(()=>{
  refreshSharedState().catch(e=>console.warn("Auto refresh skipped",e));
 },15000);
+
+// One delegated listener covers login, navigation, admin actions and player controls,
+// including elements rendered later. Disabled controls remain silent.
+document.addEventListener("pointerdown",(event)=>{
+ const target=event.target.closest("button,[onclick],.action-pro,.activity-toggle");
+ if(!target||target.disabled||target.getAttribute("aria-disabled")==="true")return;
+ playTapSound();
+},{passive:true});
 
 boot();
 </script>
