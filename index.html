@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v101 Statistics & Records plus streamlined login -->
+<!-- v102 server-enforced round deadline -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1070,7 +1070,7 @@ const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
 const storeKey="seah_wind_lms_live_supabase_v27";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
- competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
+ competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",deadlineAt:"",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
  notifications:{
   unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",
@@ -2257,8 +2257,44 @@ function round(){
  </div>
  <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="secondary" onclick="startNextCompetition()">Start New Competition</button></div>`;
 }
+
+function deadlineTimestamp(){
+ const value=String(state.deadlineAt||"").trim();
+ if(!value)return null;
+ const time=Date.parse(value);
+ return Number.isFinite(time)?time:null;
+}
+function pickingClosed(){
+ const time=deadlineTimestamp();
+ return time!==null&&Date.now()>=time;
+}
+function deadlineDisplay(){
+ const time=deadlineTimestamp();
+ if(time===null)return state.deadline||"Not set";
+ try{
+  return new Intl.DateTimeFormat("en-GB",{
+   weekday:"long",day:"2-digit",month:"short",year:"numeric",
+   hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Europe/London"
+  }).format(new Date(time));
+ }catch(e){
+  return state.deadline||new Date(time).toLocaleString("en-GB");
+ }
+}
+function deadlineInputValue(){
+ const time=deadlineTimestamp();
+ if(time===null)return "";
+ const d=new Date(time);
+ const parts=new Intl.DateTimeFormat("en-CA",{
+  year:"numeric",month:"2-digit",day:"2-digit",
+  hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Europe/London"
+ }).formatToParts(d).reduce((o,p)=>(o[p.type]=p.value,o),{});
+ return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
+ const closed=pickingClosed();
+ const controlsDisabled=p.locked||!p.alive||!p.paid||closed;
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div>${pendingNotificationPermissionBlock()}</div></div>`;
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
@@ -2266,12 +2302,12 @@ function myPick(){
   <div>
    <div class="kicker">Player Dashboard</div>
    <h2>Round ${state.round}</h2>
-   <div class="hero-sub">Deadline: ${escapeHtml(state.deadline)}</div>
+   <div class="hero-sub">Deadline: ${escapeHtml(deadlineDisplay())}</div>
   </div>
   <div class="player-current">
    <div class="kicker">Current Pick</div>
    <div class="hero-num">${escapeHtml(p.pick||"No team selected")}</div>
-   <div class="hero-sub">${p.pick?'Submitted':'Awaiting selection'}</div>
+   <div class="hero-sub">${p.pick?'Submitted':closed?'Picking closed':'Awaiting selection'}</div>
   </div>
  </div>
 
@@ -2282,14 +2318,15 @@ function myPick(){
   <div class="player-stat"><div class="icon-wrap navy small">${appIcon('ball')}</div><div><div class="num">${p.pick?'Yes':'No'}</div><div class="lbl">Pick Submitted</div></div></div>
  </div>
 
- <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge orange">Round ${state.round}</span></div><div class="card-body">
+ <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge ${closed?'red':'orange'}">Round ${state.round}${closed?' · Closed':''}</span></div><div class="card-body">
+  ${closed?`<div class="notice" style="margin-bottom:12px"><strong>Picking is closed for this round.</strong><br>The deadline passed at ${escapeHtml(deadlineDisplay())}. The administrator will assign a random available team if you did not submit in time.</div>`:""}
   ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
   <div class="pick-grid">
-   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${p.locked||!p.alive||!p.paid?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${used?'disabled':''}>${escapeHtml(t)}${used?' (used)':''}</option>`}).join("")}</select></div>
+   <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${controlsDisabled?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
+   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${used?'disabled':''}>${escapeHtml(t)}${used?' (used)':''}</option>`}).join("")}</select></div>
   </div>
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
-  <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked?'':'confirmPlayerPick()'}" ${p.locked||!p.alive||!p.paid?'disabled':''}>${p.locked?'✓ Confirmed':'Confirm Pick'}</button>
+  <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
  </div></div>`;
 }
 function currentRoundPickSummary(){
@@ -3036,7 +3073,8 @@ function settings(){
  <div class="card"><div class="card-head"><strong>Competition Rules</strong></div><div class="card-body">
   <div class="formrow">
    <div><label>Entry fee</label><input id="entryFee" type="number" value="${escapeHtml(state.entryFee)}"></div>
-   <div><label>Deadline</label><input id="deadline" value="${escapeHtml(state.deadline||"")}"></div>
+   <div><label>Deadline label</label><input id="deadline" value="${escapeHtml(state.deadline||"")}" placeholder="Example: Friday 17:00"></div>
+    <div><label>Exact pick cut-off</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"><div class="tiny">Players are automatically blocked at this exact UK date and time.</div></div>
   </div>
   <label>Rules</label><textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
   <br><br><button onclick="saveSettings()">Save Rules</button>
@@ -3399,6 +3437,7 @@ async function confirmPlayerPick(){
  const pick=(window.tempPick||"").trim();
 
  if(!p||!p.id)return toast("Could not identify the logged-in player.");
+ if(pickingClosed())return toast("The deadline has passed. Picking is closed for this round.");
  if(!pick)return toast("Choose a team first.");
  if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
 
@@ -3407,7 +3446,7 @@ async function confirmPlayerPick(){
 
   // v93 Step 1: Supabase checks the CURRENT paid/alive/approved state and
   // updates only the pick fields. A stale device cannot restore paid=true.
-  const {data,error}=await supabaseClient.rpc("submit_player_pick",{
+  const {data,error}=await supabaseClient.rpc("submit_player_pick_with_deadline",{
    p_user_id:p.id,
    p_pick:pick
   });
@@ -3648,21 +3687,32 @@ async function saveSettings(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  const feeEl=document.getElementById("entryFee");
  const deadlineEl=document.getElementById("deadline");
+ const deadlineAtEl=document.getElementById("deadlineAt");
  const rulesEl=document.getElementById("rulesText");
- if(!feeEl||!deadlineEl||!rulesEl)return toast("Settings form not loaded. Refresh and try again.");
+ if(!feeEl||!deadlineEl||!deadlineAtEl||!rulesEl)return toast("Settings form not loaded. Refresh and try again.");
  const fee=normaliseNumber(feeEl.value,state.entryFee||5);
  const deadline=(deadlineEl.value||"").trim();
+ const deadlineLocal=(deadlineAtEl.value||"").trim();
  const rules=(rulesEl.value||"").trim();
  if(!fee||fee<0)return toast("Enter a valid entry fee.");
- if(!deadline)return toast("Enter a deadline.");
+ if(!deadline)return toast("Enter a deadline label.");
+ if(!deadlineLocal)return toast("Set the exact pick cut-off date and time.");
  if(!rules)return toast("Enter the rules text.");
+ const parsedDeadline=new Date(deadlineLocal);
+ if(!Number.isFinite(parsedDeadline.getTime()))return toast("Enter a valid exact deadline.");
  state.entryFee=fee;
  state.deadline=deadline;
+ state.deadlineAt=parsedDeadline.toISOString();
  state.rules=rules;
  localStorage.setItem(storeKey,JSON.stringify(state));
  toast("Saving rules...");
  try{
   await dbSaveSettings();
+  const deadlineSave=await supabaseClient.rpc("set_pick_deadline",{
+   p_admin_user_id:authUser.user_id,
+   p_deadline_at:state.deadlineAt
+  });
+  if(deadlineSave.error)throw deadlineSave.error;
   await loadAppSettingsFromSupabase();
   toast("Rules and competition settings saved.");
  }catch(e){
@@ -4381,6 +4431,13 @@ async function loadAppSettingsFromSupabase(){
   if(typeof data.round_number!=="undefined"&&data.round_number!==null)state.round=Number(data.round_number)||state.round;
   if(typeof data.pot_carryover!=="undefined"&&data.pot_carryover!==null)state.potCarryover=Number(data.pot_carryover)||0;
   if(typeof data.deadline!=="undefined"&&data.deadline!==null)state.deadline=data.deadline;
+  try{
+   const deadlineRes=await supabaseClient.rpc("get_pick_deadline");
+   if(!deadlineRes.error&&deadlineRes.data){
+    const deadlineRow=Array.isArray(deadlineRes.data)?deadlineRes.data[0]:deadlineRes.data;
+    if(deadlineRow&&deadlineRow.deadline_at)state.deadlineAt=deadlineRow.deadline_at;
+   }
+  }catch(deadlineError){console.warn("Could not load exact pick deadline",deadlineError);}
   if(typeof data.rules!=="undefined"&&data.rules!==null)state.rules=data.rules;
   if(data.notifications&&typeof data.notifications==="object"){
    state.notifications=data.notifications;
