@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v100 display-name login warning and admin username visibility -->
+<!-- v101 Statistics & Records plus streamlined login -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -859,6 +859,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   color:white!important;
 }
 
+/* v101 Statistics & Records */
+.stats-record-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stats-record-table{width:100%;border-collapse:collapse}
+.stats-record-table th,.stats-record-table td{padding:10px 8px;border-bottom:1px solid #edf2f7;text-align:left;font-size:13px}
+.stats-record-table th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.stats-record-table th:not(:first-child),.stats-record-table td:not(:first-child){text-align:right}
+.stats-record-table tr:last-child td{border-bottom:0}
+.stats-record-rank{width:38px;color:#64748b;font-weight:900}
+.stats-record-team{font-weight:950;color:var(--ink)}
+.stats-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.stats-summary-card{background:linear-gradient(135deg,#071a31,#061426);color:white;border-radius:18px;padding:18px}
+.stats-summary-card .stats-summary-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#cbd5e1;font-weight:950}
+.stats-summary-card .stats-summary-value{font-size:28px;font-weight:1000;margin-top:5px}
+@media(max-width:850px){.stats-record-grid,.stats-summary{grid-template-columns:1fr}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -950,6 +964,9 @@ let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
 const AUTH_STORAGE_KEY="seah_auth_user_current";
 const REMEMBERED_USERNAME_KEY="seah_remembered_username";
 const SOUND_EFFECTS_KEY="seah_sound_effects_enabled";
+let teamStatisticsRows=[];
+let teamStatisticsLoading=false;
+let teamStatisticsError="";
 
 function soundEffectsEnabled(){
  const saved=localStorage.getItem(SOUND_EFFECTS_KEY);
@@ -1447,7 +1464,7 @@ function renderAuth(){
  }
  app.style.display="none";login.style.display="block";
  const remembered=rememberedUsername();
- login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button><button class="logout-btn" onclick="loginAdmin()">Admin Login</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
 async function saveAdminAccount(){
@@ -1604,7 +1621,7 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  ensureLeagues();
  ensureActivityLog();
@@ -1617,13 +1634,13 @@ function render(){
  const items=navItems();
  const modeSwitch=authUser.role==="admin"?`<div class="mode-switch"><button class="${role==='admin'?'active':''}" onclick="switchAdminView('admin')">Admin</button><button class="${role==='player'?'active':''}" onclick="switchAdminView('player')">Player</button></div>`:"";
  document.getElementById("nav").innerHTML=modeSwitch+items.map(([id,label])=>`<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`).join("")+`<button class="logout-btn" onclick="logout()">Logout</button>`;
- document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰]/g,"").trim();
+ document.getElementById("pageTitle").textContent=(items.find(x=>x[0]===page)?.[1]||"Dashboard").replace(/[🏠👥⚽🏆⚙️📋📖🏅📰📊]/g,"").trim();
  document.getElementById("pageSub").textContent="";
  document.getElementById("sideTitle").textContent=role==="admin"?"Administrator":currentPlayer().name;
  document.getElementById("sideSub").textContent="";
  document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");
  document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");
- const views={dashboard:dashboard,players:players,round:round,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
+ const views={dashboard:dashboard,players:players,round:round,statistics:statistics,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
  const view=views[page]||dashboard;
  const content=document.getElementById("content");
  try{
@@ -1637,7 +1654,9 @@ function render(){
 function setPage(p){
  page=p;
  render();
- if(p==="latestNews"||p==="myPick"||p==="competition"||p==="previous"){
+ if(p==="statistics"){
+  loadTeamStatistics(true);
+ }else if(p==="latestNews"||p==="myPick"||p==="competition"||p==="previous"){
   Promise.resolve()
    .then(()=>loadAppSettingsFromSupabase())
    .then(()=>syncUsersFromSupabase())
@@ -2179,6 +2198,121 @@ function competition(){
  <div class="card"><div class="card-head"><strong>🟢 Still Standing</strong><span class="badge green">${standing.length}</span></div><div class="card-body list">${standing.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayNameHtml(p)}</div><div class="compact-detail">${p.pick?'Pick submitted':'No pick yet'}</div></div><span class="compact-status ${p.pick?'ok':'wait'}">${p.pick?'Submitted':'Waiting'}</span></div>`).join("")||`<div class="notice">No players standing.</div>`}</div></div>
  <div class="card"><div class="card-head"><strong>🔴 Eliminated</strong><span class="badge red">${eliminated.length}</span></div><div class="card-body list">${eliminated.map(p=>`<div class="compact-player"><div><div class="compact-name">${displayNameHtml(p)}</div><div class="compact-detail">Round ${escapeHtml(p.outRound||"")} · ${escapeHtml(p.outPick||"")}</div></div><span class="compact-status out">Out</span></div>`).join("")||`<div class="notice">No eliminated players.</div>`}</div></div>`;
 }
+
+function normaliseStatsResult(value){
+ const v=String(value||"").toLowerCase();
+ return v==="win"?"win":"lose";
+}
+
+async function loadTeamStatistics(forceRender=false){
+ if(teamStatisticsLoading)return;
+ teamStatisticsLoading=true;
+ teamStatisticsError="";
+ if(forceRender)render();
+ try{
+  const {data,error}=await supabaseClient
+   .from("team_pick_history")
+   .select("competition_number,rollover_number,round_number,team,result");
+  if(error)throw error;
+  teamStatisticsRows=Array.isArray(data)?data:[];
+ }catch(e){
+  console.error("Statistics load failed",e);
+  teamStatisticsRows=[];
+  teamStatisticsError=e.message||"Statistics could not be loaded.";
+ }finally{
+  teamStatisticsLoading=false;
+  if(forceRender||page==="statistics")render();
+ }
+}
+
+function aggregateTeamStatistics(rows){
+ const map=new Map();
+ (rows||[]).forEach(row=>{
+  const team=String(row.team||"").trim();
+  if(!team)return;
+  const item=map.get(team)||{team,picks:0,wins:0,eliminations:0};
+  item.picks++;
+  if(normaliseStatsResult(row.result)==="win")item.wins++;
+  else item.eliminations++;
+  map.set(team,item);
+ });
+ return [...map.values()].map(item=>({
+  ...item,
+  winRate:item.picks?item.wins/item.picks*100:0,
+  eliminationRate:item.picks?item.eliminations/item.picks*100:0
+ }));
+}
+
+function statsTable(title,rows,columns,emptyMessage){
+ return `<div class="card"><div class="card-head"><strong>${escapeHtml(title)}</strong><span class="badge orange">${rows.length}</span></div><div class="card-body">
+  ${rows.length?`<table class="stats-record-table"><thead><tr><th class="stats-record-rank">#</th><th>Team</th>${columns.map(c=>`<th>${escapeHtml(c.label)}</th>`).join("")}</tr></thead><tbody>
+   ${rows.map((row,index)=>`<tr><td class="stats-record-rank">${index+1}</td><td class="stats-record-team">${escapeHtml(row.team)}</td>${columns.map(c=>`<td>${escapeHtml(c.value(row))}</td>`).join("")}</tr>`).join("")}
+  </tbody></table>`:`<div class="notice">${escapeHtml(emptyMessage)}</div>`}
+ </div></div>`;
+}
+
+function statistics(){
+ if(teamStatisticsLoading){
+  return `<div class="card"><div class="card-head"><strong>Statistics & Records</strong></div><div class="card-body"><div class="notice">Loading statistics...</div></div></div>`;
+ }
+ if(teamStatisticsError){
+  return `<div class="card"><div class="card-head"><strong>Statistics & Records</strong></div><div class="card-body"><div class="notice">Statistics could not be loaded. ${escapeHtml(teamStatisticsError)}</div><div class="actions" style="margin-top:12px"><button onclick="loadTeamStatistics(true)">Try Again</button></div></div></div>`;
+ }
+
+ const allRows=teamStatisticsRows||[];
+ const currentRows=allRows.filter(row=>Number(row.competition_number)===Number(state.competition));
+ const all=aggregateTeamStatistics(allRows);
+ const current=aggregateTeamStatistics(currentRows);
+
+ const mostPickedCurrent=current.slice().sort((a,b)=>b.picks-a.picks||a.team.localeCompare(b.team)).slice(0,10);
+ const mostPickedAll=all.slice().sort((a,b)=>b.picks-a.picks||a.team.localeCompare(b.team)).slice(0,10);
+ const successful=all.filter(x=>x.picks>=5).sort((a,b)=>b.winRate-a.winRate||b.wins-a.wins||a.team.localeCompare(b.team)).slice(0,10);
+ const giantKillers=all.filter(x=>x.eliminations>0).sort((a,b)=>b.eliminations-a.eliminations||b.eliminationRate-a.eliminationRate||a.team.localeCompare(b.team)).slice(0,10);
+ const highestElimination=all.filter(x=>x.picks>=5).sort((a,b)=>b.eliminationRate-a.eliminationRate||b.eliminations-a.eliminations||a.team.localeCompare(b.team)).slice(0,10);
+
+ const totalPicks=allRows.length;
+ const totalWins=allRows.filter(x=>normaliseStatsResult(x.result)==="win").length;
+ const totalEliminations=totalPicks-totalWins;
+ const noData="Statistics will appear once completed round results have been recorded.";
+
+ return `<div class="stats-summary">
+  <div class="stats-summary-card"><div class="stats-summary-label">Total Picks Recorded</div><div class="stats-summary-value">${totalPicks}</div></div>
+  <div class="stats-summary-card"><div class="stats-summary-label">Winning Picks</div><div class="stats-summary-value">${totalWins}</div></div>
+  <div class="stats-summary-card"><div class="stats-summary-label">Eliminations</div><div class="stats-summary-value">${totalEliminations}</div></div>
+ </div>
+
+ <div class="card"><div class="card-head"><strong>Current Competition</strong><span class="badge dark">Competition ${state.competition}</span></div><div class="card-body">
+  <div class="tiny" style="margin-bottom:12px">Completed-round picks only. Current unprocessed selections remain private.</div>
+  ${mostPickedCurrent.length?`<table class="stats-record-table"><thead><tr><th class="stats-record-rank">#</th><th>Team</th><th>Picks</th></tr></thead><tbody>${mostPickedCurrent.map((row,index)=>`<tr><td class="stats-record-rank">${index+1}</td><td class="stats-record-team">${escapeHtml(row.team)}</td><td>${row.picks}</td></tr>`).join("")}</tbody></table>`:`<div class="notice">${noData}</div>`}
+ </div></div>
+
+ <div class="stats-record-grid">
+  ${statsTable("All-Time Most Picked",mostPickedAll,[{label:"Picks",value:r=>String(r.picks)}],noData)}
+  ${statsTable("Most Successful Teams",successful,[{label:"Wins",value:r=>String(r.wins)},{label:"Win %",value:r=>r.winRate.toFixed(1)+"%"}],"At least five picks are required before a team appears here.")}
+  ${statsTable("Biggest Giant Killers",giantKillers,[{label:"Eliminations",value:r=>String(r.eliminations)},{label:"Rate",value:r=>r.eliminationRate.toFixed(1)+"%"}],noData)}
+  ${statsTable("Highest Elimination %",highestElimination,[{label:"Eliminations",value:r=>String(r.eliminations)},{label:"Rate",value:r=>r.eliminationRate.toFixed(1)+"%"}],"At least five picks are required before a team appears here.")}
+ </div>`;
+}
+
+async function recordCompletedRoundStatistics(){
+ const rows=alive()
+  .filter(p=>p&&p.id&&p.pick)
+  .map(p=>({
+   user_id:p.id,
+   competition_number:Number(state.competition)||1,
+   rollover_number:Number(state.rollover)||0,
+   round_number:Number(state.round)||1,
+   team:String(p.pick),
+   result:normaliseStatsResult(p.result)
+  }));
+
+ if(!rows.length)return true;
+
+ const {error}=await supabaseClient.rpc("record_team_pick_history",{p_rows:rows});
+ if(error)throw error;
+ return true;
+}
+
 function playerHall(){
  const sortedChamps=[];
  const seen=new Set();
@@ -3153,6 +3287,15 @@ async function processRound(){
 
  const before=alive().length;
 
+ try{
+  await recordCompletedRoundStatistics();
+  await loadTeamStatistics(false);
+ }catch(e){
+  console.error("Could not record round statistics",e);
+  toast("Round was not processed because statistics could not be saved. Check the v101 SQL setup.");
+  return;
+ }
+
  alive().forEach(p=>{
   if(p.pick&&!p.previous.includes(p.pick))p.previous.push(p.pick);
 
@@ -4094,6 +4237,7 @@ async function boot(){
  render();
  await syncUsersFromSupabase();
  await loadChampionRecords();
+ await loadTeamStatistics(false);
  await ensurePushRegistered(true);
  render();
 }
@@ -4116,6 +4260,8 @@ if("serviceWorker" in navigator){
 window.rules=rules;
 window.settings=settings;
 window.playerSettings=playerSettings;
+window.statistics=statistics;
+window.loadTeamStatistics=loadTeamStatistics;
 window.toggleSoundEffects=toggleSoundEffects;
 window.savePlayerAccount=savePlayerAccount;
 window.saveSettings=saveSettings;
