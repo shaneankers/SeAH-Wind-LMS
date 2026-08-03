@@ -861,13 +861,40 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* v101 Statistics & Records */
 .stats-record-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.stats-record-table{width:100%;border-collapse:collapse}
-.stats-record-table th,.stats-record-table td{padding:10px 8px;border-bottom:1px solid #edf2f7;text-align:left;font-size:13px}
-.stats-record-table th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
-.stats-record-table th:not(:first-child),.stats-record-table td:not(:first-child){text-align:right}
+.stats-record-table{
+  width:min(100%,620px);
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+.stats-record-table th,.stats-record-table td{
+  padding:10px 8px;
+  border-bottom:1px solid #edf2f7;
+  text-align:left;
+  font-size:13px;
+}
+.stats-record-table th{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#64748b;
+}
+.stats-record-table th:first-child,
+.stats-record-table td:first-child{
+  width:48px;
+}
+.stats-record-table th:nth-child(2),
+.stats-record-table td:nth-child(2){
+  width:auto;
+  text-align:left!important;
+}
+.stats-record-table th:not(:first-child):not(:nth-child(2)),
+.stats-record-table td:not(:first-child):not(:nth-child(2)){
+  width:105px;
+  text-align:right;
+}
 .stats-record-table tr:last-child td{border-bottom:0}
-.stats-record-rank{width:38px;color:#64748b;font-weight:900}
-.stats-record-team{font-weight:950;color:var(--ink)}
+.stats-record-rank{color:#64748b;font-weight:900}
+.stats-record-team{font-weight:950;color:var(--ink);text-align:left!important}
 .stats-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
 .stats-summary-card{background:linear-gradient(135deg,#071a31,#061426);color:white;border-radius:18px;padding:18px}
 .stats-summary-card .stats-summary-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#cbd5e1;font-weight:950}
@@ -2281,7 +2308,7 @@ function statistics(){
   <div class="stats-summary-card"><div class="stats-summary-label">Eliminations</div><div class="stats-summary-value">${totalEliminations}</div></div>
  </div>
 
- <div class="card"><div class="card-head"><strong>Current Competition</strong><span class="badge dark">Competition ${state.competition}</span></div><div class="card-body">
+ <div class="card" style="max-width:760px"><div class="card-head"><strong>Current Competition</strong><span class="badge dark">Competition ${state.competition}</span></div><div class="card-body">
   <div class="tiny" style="margin-bottom:12px">Completed-round picks only. Current unprocessed selections remain private.</div>
   ${mostPickedCurrent.length?`<table class="stats-record-table"><thead><tr><th class="stats-record-rank">#</th><th>Team</th><th>Picks</th></tr></thead><tbody>${mostPickedCurrent.map((row,index)=>`<tr><td class="stats-record-rank">${index+1}</td><td class="stats-record-team">${escapeHtml(row.team)}</td><td>${row.picks}</td></tr>`).join("")}</tbody></table>`:`<div class="notice">${noData}</div>`}
  </div></div>
