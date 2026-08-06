@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v102 server-enforced round deadline -->
+<!-- v104 buy-back, reliable payment saving and player visual refresh -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1006,6 +1006,78 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   .stats-record-grid{grid-template-columns:1fr}
   .stats-current-wrap{max-width:none}
 }
+/* v104 Player visual refresh */
+.player-top{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background:
+    linear-gradient(90deg,rgba(4,18,38,.96),rgba(7,29,57,.88)),
+    repeating-linear-gradient(90deg,transparent 0 76px,rgba(255,255,255,.035) 76px 78px),
+    linear-gradient(0deg,rgba(20,110,65,.22),rgba(20,110,65,.04));
+  border:1px solid rgba(255,255,255,.08);
+}
+.player-top::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  opacity:.22;
+  background:
+    radial-gradient(ellipse at 50% 110%,transparent 0 35%,rgba(255,255,255,.22) 35.5% 36%,transparent 36.5%),
+    radial-gradient(ellipse at 50% 112%,transparent 0 55%,rgba(255,255,255,.14) 55.5% 56%,transparent 56.5%),
+    linear-gradient(90deg,transparent 49.7%,rgba(255,255,255,.16) 49.8% 50.2%,transparent 50.3%);
+}
+.player-top::after{
+  content:"";
+  position:absolute;
+  inset:auto 0 0;
+  height:38%;
+  z-index:-1;
+  opacity:.18;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 2px,transparent 2px 34px),
+    linear-gradient(0deg,rgba(36,145,82,.6),transparent);
+  clip-path:polygon(0 100%,8% 20%,16% 70%,24% 12%,32% 66%,40% 18%,50% 70%,60% 15%,68% 68%,76% 12%,84% 70%,92% 20%,100% 100%);
+}
+.player-top .kicker{color:#fdba74}
+.player-current{
+  background:linear-gradient(135deg,#f97316,#ea580c)!important;
+  border-color:rgba(255,255,255,.16)!important;
+  box-shadow:0 12px 30px rgba(234,88,12,.24);
+}
+.player-current .kicker,
+.player-current .hero-sub{color:#fff7ed!important}
+.player-stat{
+  border-top:3px solid #f97316;
+}
+.player-stat .icon-wrap{
+  background:#fff7ed!important;
+  color:#ea580c!important;
+  border:1px solid #fed7aa;
+}
+.player-stat:nth-child(3){
+  background:linear-gradient(135deg,#fff7ed,#ffedd5);
+  border-color:#f97316;
+}
+.player-stat:nth-child(3) .num{
+  color:#ea580c!important;
+}
+.player-stat:nth-child(3) .icon-wrap{
+  background:#f97316!important;
+  color:white!important;
+  border-color:#f97316;
+}
+body.player-mode .card-head{
+  border-top:2px solid rgba(249,115,22,.72);
+}
+body.player-mode button:not(.secondary):not(.logout-btn){
+  background:linear-gradient(135deg,#f97316,#ea580c);
+}
+body.player-mode .badge.orange{
+  background:#ffedd5;
+  color:#c2410c;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1070,7 +1142,7 @@ const PUSH_FUNCTION_URL=SUPABASE_URL+"/functions/v1/push-notifications";
 
 const storeKey="seah_wind_lms_live_supabase_v27";
 let state=JSON.parse(localStorage.getItem(storeKey)||"null")||{
- competition:1,rollover:0,round:1,potCarryover:0,entryFee:5,deadline:"Saturday 12:00",deadlineAt:"",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
+ competition:1,rollover:0,round:1,potCarryover:0,manualPotAdjustment:0,entryFee:5,deadline:"Saturday 12:00",deadlineAt:"",joinCode:"SEAH2025",selectedPlayer:"Shane",adminUsername:"Shane",adminPassword:"1234",announcement:"",announcementVersion:0,disclaimer:"This app is privately run and is not an official SeAH Wind product. SeAH Wind is not responsible for the running of this competition, payments, prizes, results or app content.",
  rules:"Pick one team each round. If your team wins, you go through. If they lose, draw, or you miss the deadline, you are out. You cannot use the same team twice in one competition. Last player standing wins.",
  notifications:{
   unpaid:"Payment reminder: your SeAH Wind LMS entry is still marked as unpaid. Please pay £{entryFee} to confirm your place.",
@@ -1100,6 +1172,9 @@ const SOUND_EFFECTS_KEY="seah_sound_effects_enabled";
 let teamStatisticsRows=[];
 let teamStatisticsLoading=false;
 let teamStatisticsError="";
+let buyBackRequests=[];
+let currentBuyBackRequest=null;
+let buyBackLoading=false;
 
 function soundEffectsEnabled(){
  const saved=localStorage.getItem(SOUND_EFFECTS_KEY);
@@ -1205,7 +1280,7 @@ function sortTextList(list){return [...new Set((list||[]).map(x=>String(x||"").t
 function paid(){return state.players.filter(p=>p.paid&&p.approved&&!isQueuedForNextCompetition(p))}
 function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive&&!isQueuedForNextCompetition(p))}
 function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive&&!isQueuedForNextCompetition(p)).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
-function pot(){return (state.potCarryover||0)+(paid().length*state.entryFee)}
+function pot(){return (state.potCarryover||0)+(state.manualPotAdjustment||0)+(paid().length*state.entryFee)}
 function currentPlayer(){
  if(authUser&&authUser.user_id){
   const byId=state.players.find(p=>p.id===authUser.user_id);
@@ -1351,7 +1426,7 @@ async function syncUsersFromSupabase(){
   try{
    let stateRes=await supabaseClient
     .from("player_state")
-    .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,locked,result,previous,out_round,out_pick,admin_override_active");
+    .select("user_id,competition_number,rollover_number,round_number,paid,alive,wins,pick,locked,result,previous,out_round,out_pick,admin_override_active,buy_back_used");
 
    // Some existing Supabase databases do not have the newer locked/out columns yet.
    // Fall back to the older schema instead of letting every player sync fail.
@@ -1409,6 +1484,7 @@ async function syncUsersFromSupabase(){
     outRound:null,
     outPick:null,
     adminOverrideActive:false,
+    buyBackUsed:false,
     contactNumber:u.contact_number||"",
     notifications:u.notifications_enabled!==false
    };
@@ -1439,6 +1515,7 @@ async function syncUsersFromSupabase(){
     outRound:hasPlayerState?(ps.out_round??null):(target.outRound??null),
     outPick:hasPlayerState?(ps.out_pick??null):(target.outPick??null),
     adminOverrideActive:hasPlayerState?(ps.admin_override_active===true):(target.adminOverrideActive===true),
+    buyBackUsed:hasPlayerState?(ps.buy_back_used===true):(target.buyBackUsed===true),
     contactNumber:u.contact_number||target.contactNumber||"",
     notifications:u.notifications_enabled!==false
    };
@@ -1756,6 +1833,8 @@ function switchAdminView(view){
 }
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
+ document.body.classList.toggle("player-mode",role==="player");
+ document.body.classList.toggle("admin-mode",role==="admin");
  ensureLeagues();
  ensureActivityLog();
  if(!state.adminAlerts)state.adminAlerts=[];
@@ -1789,7 +1868,9 @@ function setPage(p){
  render();
  if(p==="statistics"){
   loadTeamStatistics(true);
- }else if(p==="latestNews"||p==="myPick"||p==="competition"||p==="previous"){
+ }else if(p==="myPick"||p==="dashboard"){
+  Promise.resolve().then(()=>loadBuyBackData(false)).then(()=>syncUsersFromSupabase()).then(()=>render()).catch(e=>console.warn("Buy-back page refresh failed",e));
+ }else if(p==="latestNews"||p==="competition"||p==="previous"){
   Promise.resolve()
    .then(()=>loadAppSettingsFromSupabase())
    .then(()=>syncUsersFromSupabase())
@@ -2155,6 +2236,7 @@ function dashboard(){
  ensureActivityLog();
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${escapeHtml(a.title||"Alert")}</strong><div>${escapeHtml(a.message||"")}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
+ ${adminBuyBackPanel()}
  <div class="admin-hero">
   <div class="admin-hero-cell">
    <div class="icon-wrap navy">${appIcon('trophy')}</div>
@@ -2258,6 +2340,101 @@ function round(){
  <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="secondary" onclick="startNextCompetition()">Start New Competition</button></div>`;
 }
 
+
+function buyBackEligible(p){
+ return !!(p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&Number(state.round)===2&&p.buyBackUsed!==true);
+}
+async function loadBuyBackData(forceRender=false){
+ if(!authUser||!authUser.user_id||buyBackLoading)return;
+ buyBackLoading=true;
+ try{
+  const adjustmentRes=await supabaseClient.rpc("get_manual_pot_adjustment");
+  if(!adjustmentRes.error){
+   const row=Array.isArray(adjustmentRes.data)?adjustmentRes.data[0]:adjustmentRes.data;
+   state.manualPotAdjustment=Number(row?.manual_pot_adjustment||0)||0;
+  }
+  if(authUser.role==="admin"){
+   const res=await supabaseClient.rpc("admin_list_buy_back_requests",{p_admin_user_id:authUser.user_id});
+   if(res.error)throw res.error;
+   buyBackRequests=Array.isArray(res.data)?res.data:[];
+   currentBuyBackRequest=null;
+  }else{
+   const res=await supabaseClient.rpc("get_my_buy_back_request",{p_user_id:authUser.user_id});
+   if(res.error)throw res.error;
+   const rows=Array.isArray(res.data)?res.data:[];
+   currentBuyBackRequest=rows[0]||null;
+   buyBackRequests=[];
+  }
+ }catch(e){console.warn("Buy-back data load failed",e);}
+ finally{
+  buyBackLoading=false;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  if(forceRender)render();
+ }
+}
+async function requestBuyBack(){
+ const p=currentPlayer();
+ if(!buyBackEligible(p))return toast("A Round 1 buy-back is not currently available.");
+ if(!confirm(`Request a Round 1 buy-back for £${state.entryFee}? You must pay the administrator before it can be approved.`))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("request_round1_buy_back",{p_user_id:p.id});
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Buy-back request failed.");
+  toast("Buy-back requested. Please pay the administrator.");
+  await loadBuyBackData(true);
+ }catch(e){console.error(e);toast(e.message||"Buy-back request failed.");}
+}
+async function approveBuyBack(requestId){
+ if(!confirm("Confirm payment has been received and approve this buy-back?"))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("approve_round1_buy_back",{p_admin_user_id:authUser.user_id,p_request_id:requestId});
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Approval failed.");
+  toast("Buy-back approved and player reinstated.");
+  await syncUsersFromSupabase();
+  await loadBuyBackData(true);
+ }catch(e){console.error(e);toast(e.message||"Buy-back approval failed.");}
+}
+async function declineBuyBack(requestId){
+ if(!confirm("Decline this buy-back request?"))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("decline_round1_buy_back",{p_admin_user_id:authUser.user_id,p_request_id:requestId});
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Decline failed.");
+  toast("Buy-back request declined.");
+  await loadBuyBackData(true);
+ }catch(e){console.error(e);toast(e.message||"Could not decline request.");}
+}
+function buyBackPlayerCard(p){
+ if(!buyBackEligible(p))return "";
+ const status=String(currentBuyBackRequest?.status||"");
+ if(status==="pending")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Buy-back requested.</strong><br>Please pay the administrator £${state.entryFee}. You will be reinstated once payment is confirmed.</div></div></div>`;
+ if(status==="declined")return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice">Your buy-back request was declined. Contact the administrator if you believe this is incorrect.</div></div></div>`;
+ return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back</strong><span class="badge orange">£${state.entryFee}</span></div><div class="card-body"><div class="notice">You were eliminated in Round 1. You may request one buy-back before the Round 2 deadline. Your Round 1 team will remain unavailable.</div><div class="actions" style="margin-top:12px"><button onclick="requestBuyBack()">Request Buy-Back</button></div></div></div>`;
+}
+function adminBuyBackPanel(){
+ const pending=(buyBackRequests||[]).filter(r=>r.status==="pending");
+ if(!pending.length)return "";
+ return `<div class="card"><div class="card-head"><strong>Round 1 Buy-Back Requests</strong><span class="badge orange">${pending.length}</span></div><div class="card-body list">${pending.map(r=>`<div class="item"><div><div class="item-title">${escapeHtml(r.display_name||r.username||"Player")}</div><div class="tiny">£${Number(r.fee||state.entryFee)} · Awaiting payment confirmation</div></div><div class="actions"><button class="small" onclick="approveBuyBack('${escapeAttr(r.id)}')">Approve</button><button class="small secondary" onclick="declineBuyBack('${escapeAttr(r.id)}')">Decline</button></div></div>`).join("")}</div></div>`;
+}
+async function saveManualPotAdjustment(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const el=document.getElementById("manualPotAdjustment");
+ const value=Number(el?.value);
+ if(!Number.isFinite(value))return toast("Enter a valid pot adjustment.");
+ if(!confirm(`Set the manual pot adjustment to £${value.toFixed(2)}?`))return;
+ try{
+  const {error}=await supabaseClient.rpc("set_manual_pot_adjustment",{p_admin_user_id:authUser.user_id,p_amount:value});
+  if(error)throw error;
+  state.manualPotAdjustment=value;
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  toast("Manual pot adjustment saved.");render();
+ }catch(e){console.error(e);toast(e.message||"Pot adjustment failed.");}
+}
+
 function deadlineTimestamp(){
  const value=String(state.deadlineAt||"").trim();
  if(!value)return null;
@@ -2296,9 +2473,10 @@ function myPick(){
  const closed=pickingClosed();
  const controlsDisabled=p.locked||!p.alive||!p.paid||closed;
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div>${pendingNotificationPermissionBlock()}</div></div>`;
+ const buyBackCard=buyBackPlayerCard(p);
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
- return `${announcementCard}<div class="player-top">
+ return `${announcementCard}${buyBackCard}<div class="player-top">
   <div>
    <div class="kicker">Player Dashboard</div>
    <h2>Round ${state.round}</h2>
@@ -3080,6 +3258,8 @@ function settings(){
   <br><br><button onclick="saveSettings()">Save Rules</button>
  </div></div>
 
+ <div class="card"><div class="card-head"><strong>Manual Pot Adjustment</strong></div><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></div>
+
  <div class="card"><div class="card-head"><strong>Announcements & Disclaimer</strong></div><div class="card-body notification-editor">
   <div><label>Player dashboard announcement</label><textarea id="announcementText" rows="4" placeholder="Example: Competition delayed until next weekend.">${escapeHtml(state.announcement||"")}</textarea><div class="tiny">Shown above the player dashboard round card. When this text changes, players will see it again even if they dismissed the previous one.</div></div>
   <div><label>Disclaimer</label><textarea id="disclaimerText" rows="5">${escapeHtml(state.disclaimer||"")}</textarea><div class="tiny">Shown on the login page and the player Rules page.</div></div>
@@ -3282,8 +3462,12 @@ async function rejectPlayer(i){
 async function togglePaid(i){
  const p=state.players[i];
  if(!p)return toast("Player not found.");
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(!p.id)return toast("Player account is missing its database ID.");
 
- if(!p.paid&&shouldQueueForNextCompetition(p)){
+ const targetPaid=!p.paid;
+
+ if(targetPaid&&shouldQueueForNextCompetition(p)){
   queueForNextCompetition(p);
   addActivity("player",p.name+" queued for next competition","Payment blocked because current competition has already started");
   toast(p.name+" joined after the competition started. They are queued for the next competition and cannot pick this one.");
@@ -3291,18 +3475,45 @@ async function togglePaid(i){
   return;
  }
 
- p.paid=!p.paid;
+ const originalPaid=p.paid;
+ const buttons=[...document.querySelectorAll(`button[onclick="togglePaid(${i})"]`)];
+ buttons.forEach(button=>{button.disabled=true;button.textContent="Saving...";});
 
- // An explicitly admitted late player remains active when payment is updated.
- if(p.paid&&p.adminOverrideActive===true){
-  p.result="pending";
-  p.alive=true;
-  p.locked=false;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_set_player_paid",{
+   p_admin_user_id:authUser.user_id,
+   p_user_id:p.id,
+   p_paid:targetPaid
+  });
+  if(error)throw error;
+
+  const saved=Array.isArray(data)?data[0]:data;
+  if(!saved||saved.success!==true)throw new Error(saved?.message||"Payment status was not saved.");
+
+  p.paid=saved.paid===true;
+  p.alive=saved.alive!==false;
+  p.locked=saved.locked===true;
+  p.result=saved.result||"pending";
+
+  addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status confirmed by database");
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  await dbSaveActivityLog();
+
+  await syncUsersFromSupabase();
+  const confirmed=state.players.find(x=>x.id===p.id);
+  if(!confirmed||confirmed.paid!==targetPaid){
+   throw new Error("The database did not confirm the payment change. Please try again.");
+  }
+
+  toast(`${p.name} marked ${targetPaid?"paid":"unpaid"}.`);
+  render();
+ }catch(e){
+  console.error("Payment status save failed",e);
+  p.paid=originalPaid;
+  toast("Payment status did not save: "+(e.message||"unknown error"));
+  await syncUsersFromSupabase();
+  render();
  }
-
- addActivity("paid",p.name+" marked "+(p.paid?"paid":"unpaid"),"Payment status updated");
- toast(`${p.name} marked ${p.paid?"paid":"unpaid"}.`);
- await saveNow();
 }
 async function toggleAlive(i){
  const p=state.players[i];
@@ -3983,6 +4194,7 @@ async function dbUpsertPlayer(p){
   out_round:p.outRound??null,
   out_pick:p.outPick??null,
   admin_override_active:p.adminOverrideActive===true,
+  buy_back_used:p.buyBackUsed===true,
   updated_at:new Date().toISOString()
  };
  const attempts=[
@@ -4366,7 +4578,8 @@ async function createAccount(){
     outPick:null,
     notifications:true,
     contactNumber:contactNumber,
-    adminOverrideActive:false
+    adminOverrideActive:false,
+    buyBackUsed:false
    };
    state.players.push(p);
   }
@@ -4475,6 +4688,7 @@ async function boot(){
  await syncUsersFromSupabase();
  await loadChampionRecords();
  await loadTeamStatistics(false);
+ await loadBuyBackData(false);
  await ensurePushRegistered(true);
  render();
 }
@@ -4499,6 +4713,10 @@ window.settings=settings;
 window.playerSettings=playerSettings;
 window.statistics=statistics;
 window.loadTeamStatistics=loadTeamStatistics;
+window.requestBuyBack=requestBuyBack;
+window.approveBuyBack=approveBuyBack;
+window.declineBuyBack=declineBuyBack;
+window.saveManualPotAdjustment=saveManualPotAdjustment;
 window.toggleSoundEffects=toggleSoundEffects;
 window.savePlayerAccount=savePlayerAccount;
 window.saveSettings=saveSettings;
