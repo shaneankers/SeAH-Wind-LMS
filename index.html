@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v104.3 gold pot and stadium header -->
+<!-- v105 admin/player visual alignment and player polls -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1128,6 +1128,122 @@ body.player-mode .badge.orange{
   }
 }
 }
+
+/* ===== v105 Admin/Player visual alignment ===== */
+:root{--pot-gold:#d9ad3f}
+
+/* Admin summary cards now mirror player summary cards */
+.stat-pro{
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  color:white!important;
+  box-shadow:0 14px 30px rgba(2,8,23,.18)!important;
+}
+.stat-pro .num{color:white!important}
+.stat-pro .lbl{color:#e2e8f0!important}
+.stat-pro .icon-wrap{
+  background:#15283e!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  color:#ff6417!important;
+}
+.stat-pro .icon-wrap svg,
+.stat-pro .icon-wrap svg *{
+  stroke:#ff6417!important;
+  color:#ff6417!important;
+}
+.stat-pro .icon-wrap.red{
+  color:#ff6417!important;
+  background:#15283e!important;
+  border-color:rgba(255,255,255,.12)!important;
+}
+
+/* Top admin hero icons use the same orange icon treatment */
+.admin-hero .icon-wrap.navy{
+  background:#15283e!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  color:#ff6417!important;
+}
+.admin-hero .icon-wrap.navy svg,
+.admin-hero .icon-wrap.navy svg *{
+  stroke:#ff6417!important;
+}
+
+/* Pot is a muted gold on both sides */
+.hero-num.orange{color:var(--pot-gold)!important}
+.player-stat:nth-child(3) .num{color:var(--pot-gold)!important}
+
+/* Keep current pick wording white */
+.player-current .kicker,
+.player-current .hero-num,
+.player-current .hero-sub{color:white!important}
+
+/* Make the existing stadium backdrop more visible and stretch it behind the logo too */
+.header{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  border-radius:24px!important;
+}
+.header::before{
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+  height:145px!important;
+  top:-18px!important;
+  opacity:.58!important;
+  -webkit-mask-image:linear-gradient(90deg,#000 0%,#000 100%)!important;
+  mask-image:linear-gradient(90deg,#000 0%,#000 100%)!important;
+  background-position:center 34%!important;
+}
+.header::after{
+  background:linear-gradient(90deg,rgba(1,10,24,.62) 0%,rgba(1,10,24,.30) 38%,rgba(1,10,24,.12) 70%,rgba(1,10,24,.24) 100%)!important;
+}
+
+/* Poll settings/results */
+.poll-option-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:8px}
+.poll-results{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.poll-result-row{display:grid;grid-template-columns:minmax(110px,1fr) 2fr auto;gap:10px;align-items:center}
+.poll-bar{height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden}
+.poll-bar > span{display:block;height:100%;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:999px}
+.poll-vote-count{font-weight:950;color:var(--ink);min-width:34px;text-align:right}
+
+/* Poll popup */
+#playerPollModal .poll-shell{
+  background:white;
+  border-radius:24px;
+  max-width:520px;
+  width:100%;
+  padding:22px;
+  box-shadow:0 28px 80px rgba(0,0,0,.38);
+}
+#playerPollModal .poll-title{
+  font-size:22px;
+  font-weight:1000;
+  color:var(--ink);
+  margin:0 0 8px;
+}
+#playerPollModal .poll-question{
+  font-size:17px;
+  font-weight:900;
+  color:var(--ink);
+  line-height:1.4;
+  margin-bottom:16px;
+}
+#playerPollModal .poll-choice{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  margin-bottom:9px;
+  cursor:pointer;
+  background:#fff;
+}
+#playerPollModal .poll-choice:hover{border-color:#fb923c;background:#fff7ed}
+#playerPollModal .poll-choice input{width:auto;margin:0}
+#playerPollModal .poll-choice span{font-weight:850;color:var(--ink)}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1181,6 +1297,21 @@ body.player-mode .badge.orange{
     </div>
   </div>
 </div>
+
+<div id="playerPollModal" style="display:none;position:fixed;inset:0;background:rgba(2,8,23,.78);align-items:center;justify-content:center;padding:18px;z-index:110">
+  <div class="poll-shell">
+    <div class="kicker" style="color:#f97316;margin-bottom:6px">PLAYER POLL</div>
+    <h3 class="poll-title">We want your opinion</h3>
+    <div id="playerPollQuestion" class="poll-question"></div>
+    <div id="playerPollOptions"></div>
+    <div class="actions" style="margin-top:16px">
+      <button onclick="submitPlayerPollVote()">Submit Vote</button>
+      <button class="secondary" onclick="closePlayerPollModal()">Not Now</button>
+    </div>
+    <div class="tiny" style="margin-top:10px">One vote per player. You can choose Not Now and answer the next time you open the app.</div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL="https://geqqdhmjmucjmsynhewm.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_eTGcnIkUzl_ypR4CiXl9dw_3BJGsWjL";
@@ -1225,6 +1356,10 @@ let teamStatisticsError="";
 let buyBackRequests=[];
 let currentBuyBackRequest=null;
 let buyBackLoading=false;
+let activePlayerPoll=null;
+let adminPoll=null;
+let adminPollResults=[];
+let pollLoading=false;
 
 function soundEffectsEnabled(){
  const saved=localStorage.getItem(SOUND_EFFECTS_KEY);
@@ -1920,6 +2055,8 @@ function setPage(p){
   loadTeamStatistics(true);
  }else if(p==="myPick"||p==="dashboard"){
   Promise.resolve().then(()=>loadBuyBackData(false)).then(()=>syncUsersFromSupabase()).then(()=>render()).catch(e=>console.warn("Buy-back page refresh failed",e));
+ }else if(p==="settings"&&authUser&&authUser.role==="admin"){
+  loadAdminPollData(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
   Promise.resolve()
    .then(()=>loadAppSettingsFromSupabase())
@@ -2390,6 +2527,170 @@ function round(){
  <div class="actions"><button class="yellow" onclick="processRound()">Process Results</button><button class="secondary" onclick="startNextCompetition()">Start New Competition</button></div>`;
 }
 
+
+
+function normalisePollOptions(value){
+ if(Array.isArray(value))return value.map(x=>String(x||"").trim()).filter(Boolean);
+ if(typeof value==="string"){
+  try{
+   const parsed=JSON.parse(value);
+   if(Array.isArray(parsed))return parsed.map(x=>String(x||"").trim()).filter(Boolean);
+  }catch(e){}
+ }
+ return [];
+}
+
+async function loadActivePlayerPoll(showPopup=false){
+ if(!authUser||authUser.role==="admin"||!authUser.user_id||pollLoading)return;
+ pollLoading=true;
+ try{
+  const {data,error}=await supabaseClient.rpc("get_active_player_poll",{p_user_id:authUser.user_id});
+  if(error)throw error;
+  const row=Array.isArray(data)?data[0]:data;
+  activePlayerPoll=row&&row.poll_id?{
+   id:row.poll_id,
+   question:row.question||"",
+   options:normalisePollOptions(row.options),
+   hasVoted:row.has_voted===true
+  }:null;
+  if(showPopup&&activePlayerPoll&&!activePlayerPoll.hasVoted){
+   openPlayerPollModal();
+  }
+ }catch(e){
+  console.warn("Could not load player poll",e);
+ }finally{
+  pollLoading=false;
+ }
+}
+
+function openPlayerPollModal(){
+ if(!activePlayerPoll||activePlayerPoll.hasVoted)return;
+ const modal=document.getElementById("playerPollModal");
+ const q=document.getElementById("playerPollQuestion");
+ const options=document.getElementById("playerPollOptions");
+ if(!modal||!q||!options)return;
+ q.textContent=activePlayerPoll.question;
+ options.innerHTML=activePlayerPoll.options.map((option,index)=>`
+  <label class="poll-choice">
+   <input type="radio" name="playerPollChoice" value="${index}">
+   <span>${escapeHtml(option)}</span>
+  </label>`).join("");
+ modal.style.display="flex";
+}
+
+function closePlayerPollModal(){
+ const modal=document.getElementById("playerPollModal");
+ if(modal)modal.style.display="none";
+}
+
+async function submitPlayerPollVote(){
+ if(!activePlayerPoll||!authUser||authUser.role==="admin")return;
+ const selected=document.querySelector('input[name="playerPollChoice"]:checked');
+ if(!selected)return toast("Choose an answer first.");
+ const optionIndex=Number(selected.value);
+ try{
+  const {data,error}=await supabaseClient.rpc("submit_player_poll_vote",{
+   p_user_id:authUser.user_id,
+   p_poll_id:activePlayerPoll.id,
+   p_option_index:optionIndex
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Vote was not saved.");
+  activePlayerPoll.hasVoted=true;
+  closePlayerPollModal();
+  toast("Thanks — your vote has been recorded.");
+ }catch(e){
+  console.error("Poll vote failed",e);
+  toast(e.message||"Could not save your vote.");
+ }
+}
+
+async function loadAdminPollData(forceRender=false){
+ if(!authUser||authUser.role!=="admin")return;
+ try{
+  const pollRes=await supabaseClient.rpc("admin_get_current_poll",{p_admin_user_id:authUser.user_id});
+  if(pollRes.error)throw pollRes.error;
+  const row=Array.isArray(pollRes.data)?pollRes.data[0]:pollRes.data;
+  adminPoll=row&&row.poll_id?{
+   id:row.poll_id,
+   question:row.question||"",
+   options:normalisePollOptions(row.options),
+   active:row.active===true,
+   createdAt:row.created_at||null
+  }:null;
+  adminPollResults=[];
+  if(adminPoll){
+   const resultRes=await supabaseClient.rpc("admin_get_poll_results",{
+    p_admin_user_id:authUser.user_id,
+    p_poll_id:adminPoll.id
+   });
+   if(resultRes.error)throw resultRes.error;
+   adminPollResults=Array.isArray(resultRes.data)?resultRes.data:[];
+  }
+  if(forceRender)render();
+ }catch(e){
+  console.warn("Could not load poll admin data",e);
+  if(forceRender)toast("Could not load poll results.");
+ }
+}
+
+function renderAdminPollResults(){
+ if(!adminPoll)return `<div class="notice">No poll has been published yet.</div>`;
+ const total=adminPollResults.reduce((sum,row)=>sum+Number(row.vote_count||0),0);
+ const counts=new Map(adminPollResults.map(row=>[Number(row.option_index),Number(row.vote_count||0)]));
+ return `<div class="notice" style="margin-bottom:12px"><strong>${escapeHtml(adminPoll.question)}</strong><br>${adminPoll.active?"Currently active":"Closed"} · ${total} vote${total===1?"":"s"}</div>
+ <div class="poll-results">
+  ${adminPoll.options.map((option,index)=>{
+   const count=counts.get(index)||0;
+   const pct=total?Math.round((count/total)*100):0;
+   return `<div class="poll-result-row"><div><strong>${escapeHtml(option)}</strong><div class="tiny">${pct}%</div></div><div class="poll-bar"><span style="width:${pct}%"></span></div><div class="poll-vote-count">${count}</div></div>`;
+  }).join("")}
+ </div>`;
+}
+
+async function publishPoll(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const question=(document.getElementById("pollQuestion")?.value||"").trim();
+ const options=[1,2,3,4,5,6].map(i=>(document.getElementById(`pollOption${i}`)?.value||"").trim()).filter(Boolean);
+ if(!question)return toast("Enter a poll question.");
+ if(options.length<2)return toast("Add at least two answer options.");
+ if(!confirm("Publish this poll to players? It will replace any currently active poll."))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_publish_player_poll",{
+   p_admin_user_id:authUser.user_id,
+   p_question:question,
+   p_options:options
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Poll was not published.");
+  toast("Poll published. Players will see it when they open the app.");
+  await loadAdminPollData(true);
+ }catch(e){
+  console.error("Poll publish failed",e);
+  toast(e.message||"Could not publish poll.");
+ }
+}
+
+async function closeActivePoll(){
+ if(!authUser||authUser.role!=="admin"||!adminPoll?.id)return;
+ if(!confirm("Close this poll? Players will no longer be able to vote."))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_close_player_poll",{
+   p_admin_user_id:authUser.user_id,
+   p_poll_id:adminPoll.id
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Poll was not closed.");
+  toast("Poll closed.");
+  await loadAdminPollData(true);
+ }catch(e){
+  console.error("Poll close failed",e);
+  toast(e.message||"Could not close poll.");
+ }
+}
 
 function buyBackEligible(p){
  return !!(p&&p.approved&&p.alive===false&&Number(p.outRound)===1&&Number(state.round)===2&&p.buyBackUsed!==true);
@@ -3324,6 +3625,22 @@ function settings(){
   <button onclick="saveNotificationMessages()">Save Notification Messages</button>
   <button class="ghost" onclick="togglePlaceholders()">ⓘ Available placeholders</button>
   <div id="placeholderBox" class="placeholder-box notice">{entryFee}, {round}, {deadline}, {competition}, {winner}</div>
+ </div></div>
+
+
+ <div class="card"><div class="card-head"><strong>Player Polls</strong><span class="badge orange">${adminPoll?.active?"Active":"Feedback"}</span></div><div class="card-body">
+  <div class="notice" style="margin-bottom:14px">Publish a short poll for players. It appears as a popup when they open the app and each player can vote once.</div>
+  <label>Question</label>
+  <input id="pollQuestion" placeholder="Example: Would you rather the entry fee be £5 or £10?">
+  <div style="margin-top:12px"><label>Answer options</label>
+   ${[1,2,3,4,5,6].map(i=>`<div class="poll-option-row"><input id="pollOption${i}" placeholder="Option ${i}${i>2?" (optional)":""}"></div>`).join("")}
+  </div>
+  <div class="actions" style="margin-top:12px">
+   <button onclick="publishPoll()">Publish Poll</button>
+   ${adminPoll?.active?`<button class="secondary" onclick="closeActivePoll()">Close Current Poll</button>`:""}
+   <button class="ghost" onclick="loadAdminPollData(true)">Refresh Results</button>
+  </div>
+  <div style="margin-top:18px"><label>Current / latest poll</label>${renderAdminPollResults()}</div>
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
@@ -4502,6 +4819,7 @@ async function loginUser(){
   if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
   await ensurePushRegistered(false);
   render();
+  await loadActivePlayerPoll(true);
  }catch(e){
   console.error("Post-login render/sync failed",e);
   toast("Login succeeded. Refreshing dashboard...");
@@ -4643,6 +4961,7 @@ async function createAccount(){
   localStorage.setItem(storeKey,JSON.stringify(state));
   await ensurePushRegistered(false);
   render();
+  await loadActivePlayerPoll(true);
  }catch(e){
   console.error("Post-create render/sync failed",e);
   toast("Account created. Refreshing dashboard...");
@@ -4739,8 +5058,10 @@ async function boot(){
  await loadChampionRecords();
  await loadTeamStatistics(false);
  await loadBuyBackData(false);
+ await loadAdminPollData(false);
  await ensurePushRegistered(true);
  render();
+ await loadActivePlayerPoll(true);
 }
 
 
@@ -4767,6 +5088,11 @@ window.requestBuyBack=requestBuyBack;
 window.approveBuyBack=approveBuyBack;
 window.declineBuyBack=declineBuyBack;
 window.saveManualPotAdjustment=saveManualPotAdjustment;
+window.submitPlayerPollVote=submitPlayerPollVote;
+window.closePlayerPollModal=closePlayerPollModal;
+window.publishPoll=publishPoll;
+window.closeActivePoll=closeActivePoll;
+window.loadAdminPollData=loadAdminPollData;
 window.toggleSoundEffects=toggleSoundEffects;
 window.savePlayerAccount=savePlayerAccount;
 window.saveSettings=saveSettings;
