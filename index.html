@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v104.1 cosmetic refinement only -->
+<!-- v104.2 player cosmetics aligned with admin -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1006,46 +1006,75 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   .stats-record-grid{grid-template-columns:1fr}
   .stats-current-wrap{max-width:none}
 }
-/* v104.1 Cosmetic refinement only */
+/* v104.2 Player cosmetics aligned with admin */
 
-/* Keep the round panel clean and navy - no pitch/stadium graphic inside it. */
+/* Keep the player hero clean and navy. */
 .player-top{
   background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
   border:1px solid rgba(255,255,255,.08)!important;
 }
 .player-top::before,
-.player-top::after{content:none!important;display:none!important}
-.player-top .kicker{color:#fdba74}
+.player-top::after{
+  content:none!important;
+  display:none!important;
+}
+.player-top .kicker{color:#fdba74!important}
+
+/* Current Pick panel: orange panel is fine, but all wording stays white. */
 .player-current{
   background:linear-gradient(135deg,#f97316,#ea580c)!important;
   border-color:rgba(255,255,255,.16)!important;
   box-shadow:0 12px 30px rgba(234,88,12,.24);
 }
 .player-current .kicker,
-.player-current .hero-sub{color:#fff7ed!important}
-
-/* All four player summary cards stay the same navy. Only the icon treatment is orange. */
-.player-stat{
-  background:linear-gradient(135deg,#071a31,#061426)!important;
-  border-top:3px solid #f97316!important;
+.player-current .hero-num,
+.player-current .hero-sub{
   color:white!important;
 }
-.player-stat .num{color:white!important}
-.player-stat .lbl{color:#cbd5e1!important}
+
+/* Player summary cards mirror the admin cards. */
+.player-stat{
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  border-top:0!important;
+  color:white!important;
+}
+.player-stat .num{
+  color:white!important;
+}
+.player-stat .lbl{
+  color:white!important;
+}
+
+/* Only the small icon/glyph is orange. */
 .player-stat .icon-wrap,
 .player-stat:nth-child(3) .icon-wrap{
-  background:#fff7ed!important;
-  color:#f97316!important;
-  border:1px solid #fed7aa!important;
+  background:#15283e!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  color:#ff6417!important;
 }
+.player-stat .icon-wrap svg,
+.player-stat .icon-wrap svg *,
+.player-stat:nth-child(3) .icon-wrap svg,
+.player-stat:nth-child(3) .icon-wrap svg *{
+  stroke:#ff6417!important;
+  color:#ff6417!important;
+}
+
+/* Pot card remains navy; only the money value is orange. */
 .player-stat:nth-child(3){
   background:linear-gradient(135deg,#071a31,#061426)!important;
-  border-color:#f97316!important;
+  border-color:transparent!important;
 }
-.player-stat:nth-child(3) .num{color:white!important}
+.player-stat:nth-child(3) .num{
+  color:#ff6417!important;
+}
+.player-stat:nth-child(3) .lbl{
+  color:white!important;
+}
 
+/* Orange accents on player cards/buttons, matching admin visual language. */
 body.player-mode .card-head{
-  border-top:2px solid rgba(249,115,22,.72);
+  border-top:0!important;
 }
 body.player-mode button:not(.secondary):not(.logout-btn){
   background:linear-gradient(135deg,#f97316,#ea580c);
@@ -1055,8 +1084,7 @@ body.player-mode .badge.orange{
   color:#c2410c;
 }
 
-/* Subtle stadium backdrop across the TOP app area, concentrated on the right.
-   It sits behind the existing logo/title/database badge and adds no height. */
+/* Subtle top-of-app stadium atmosphere only, no extra height. */
 .header{
   position:relative;
   isolation:isolate;
@@ -1068,20 +1096,19 @@ body.player-mode .badge.orange{
   content:"";
   position:absolute;
   z-index:-2;
-  top:-30px;
-  right:-10px;
+  top:-24px;
+  right:-6px;
   width:min(72%,900px);
-  height:145px;
+  height:138px;
   pointer-events:none;
-  opacity:.38;
+  opacity:.32;
   background:
-    radial-gradient(circle at 76% 20%,rgba(255,255,255,.95) 0 2px,rgba(255,196,110,.65) 3px 5px,transparent 6px),
-    radial-gradient(circle at 82% 23%,rgba(255,255,255,.9) 0 2px,rgba(255,196,110,.6) 3px 5px,transparent 6px),
-    radial-gradient(circle at 88% 26%,rgba(255,255,255,.85) 0 2px,rgba(255,196,110,.55) 3px 5px,transparent 6px),
-    radial-gradient(ellipse at 72% 108%,transparent 0 43%,rgba(255,255,255,.16) 43.5% 44.5%,transparent 45%),
-    radial-gradient(ellipse at 72% 109%,transparent 0 60%,rgba(255,255,255,.1) 60.5% 61.5%,transparent 62%),
-    linear-gradient(162deg,transparent 0 55%,rgba(14,70,49,.28) 55.5% 70%,transparent 70.5%),
-    linear-gradient(180deg,rgba(14,41,72,.18),rgba(5,21,40,.02));
+    radial-gradient(circle at 74% 18%,rgba(255,255,255,.95) 0 2px,rgba(255,180,90,.55) 3px 5px,transparent 6px),
+    radial-gradient(circle at 81% 21%,rgba(255,255,255,.9) 0 2px,rgba(255,180,90,.5) 3px 5px,transparent 6px),
+    radial-gradient(circle at 88% 24%,rgba(255,255,255,.85) 0 2px,rgba(255,180,90,.45) 3px 5px,transparent 6px),
+    radial-gradient(ellipse at 74% 106%,transparent 0 44%,rgba(255,255,255,.14) 44.5% 45.2%,transparent 45.7%),
+    radial-gradient(ellipse at 74% 108%,transparent 0 61%,rgba(255,255,255,.08) 61.5% 62%,transparent 62.5%),
+    linear-gradient(165deg,transparent 0 55%,rgba(17,88,58,.22) 55.5% 71%,transparent 71.5%);
 }
 .header::after{
   content:"";
@@ -1090,16 +1117,20 @@ body.player-mode .badge.orange{
   right:0;
   bottom:0;
   width:min(68%,860px);
-  height:55px;
+  height:50px;
   pointer-events:none;
-  opacity:.28;
-  clip-path:polygon(0 100%,7% 46%,15% 78%,24% 34%,33% 73%,42% 40%,52% 78%,62% 35%,72% 71%,82% 42%,91% 75%,100% 34%,100% 100%);
+  opacity:.24;
+  clip-path:polygon(0 100%,7% 48%,15% 78%,24% 35%,33% 73%,42% 42%,52% 77%,62% 35%,72% 72%,82% 43%,91% 76%,100% 36%,100% 100%);
   background:
-    repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 2px,transparent 2px 30px),
-    linear-gradient(0deg,rgba(255,120,31,.12),rgba(10,39,69,.36));
+    repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 2px,transparent 2px 30px),
+    linear-gradient(0deg,rgba(255,120,31,.09),rgba(10,39,69,.30));
 }
 @media(max-width:700px){
-  .header::before,.header::after{opacity:.18;width:76%}
+  .header::before,
+  .header::after{
+    opacity:.16;
+    width:76%;
+  }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
