@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v104 buy-back, reliable payment saving and player visual refresh -->
+<!-- v104.1 cosmetic refinement only -->
 <meta name="theme-color" content="#061426"/>
 <link rel="manifest" href="manifest.webmanifest"/>
 <style>
@@ -1006,40 +1006,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   .stats-record-grid{grid-template-columns:1fr}
   .stats-current-wrap{max-width:none}
 }
-/* v104 Player visual refresh */
+/* v104.1 Cosmetic refinement only */
+
+/* Keep the round panel clean and navy - no pitch/stadium graphic inside it. */
 .player-top{
-  position:relative;
-  overflow:hidden;
-  isolation:isolate;
-  background:
-    linear-gradient(90deg,rgba(4,18,38,.96),rgba(7,29,57,.88)),
-    repeating-linear-gradient(90deg,transparent 0 76px,rgba(255,255,255,.035) 76px 78px),
-    linear-gradient(0deg,rgba(20,110,65,.22),rgba(20,110,65,.04));
-  border:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  border:1px solid rgba(255,255,255,.08)!important;
 }
-.player-top::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  z-index:-2;
-  opacity:.22;
-  background:
-    radial-gradient(ellipse at 50% 110%,transparent 0 35%,rgba(255,255,255,.22) 35.5% 36%,transparent 36.5%),
-    radial-gradient(ellipse at 50% 112%,transparent 0 55%,rgba(255,255,255,.14) 55.5% 56%,transparent 56.5%),
-    linear-gradient(90deg,transparent 49.7%,rgba(255,255,255,.16) 49.8% 50.2%,transparent 50.3%);
-}
-.player-top::after{
-  content:"";
-  position:absolute;
-  inset:auto 0 0;
-  height:38%;
-  z-index:-1;
-  opacity:.18;
-  background:
-    repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 2px,transparent 2px 34px),
-    linear-gradient(0deg,rgba(36,145,82,.6),transparent);
-  clip-path:polygon(0 100%,8% 20%,16% 70%,24% 12%,32% 66%,40% 18%,50% 70%,60% 15%,68% 68%,76% 12%,84% 70%,92% 20%,100% 100%);
-}
+.player-top::before,
+.player-top::after{content:none!important;display:none!important}
 .player-top .kicker{color:#fdba74}
 .player-current{
   background:linear-gradient(135deg,#f97316,#ea580c)!important;
@@ -1048,26 +1023,27 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 }
 .player-current .kicker,
 .player-current .hero-sub{color:#fff7ed!important}
+
+/* All four player summary cards stay the same navy. Only the icon treatment is orange. */
 .player-stat{
-  border-top:3px solid #f97316;
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  border-top:3px solid #f97316!important;
+  color:white!important;
 }
-.player-stat .icon-wrap{
+.player-stat .num{color:white!important}
+.player-stat .lbl{color:#cbd5e1!important}
+.player-stat .icon-wrap,
+.player-stat:nth-child(3) .icon-wrap{
   background:#fff7ed!important;
-  color:#ea580c!important;
-  border:1px solid #fed7aa;
+  color:#f97316!important;
+  border:1px solid #fed7aa!important;
 }
 .player-stat:nth-child(3){
-  background:linear-gradient(135deg,#fff7ed,#ffedd5);
-  border-color:#f97316;
+  background:linear-gradient(135deg,#071a31,#061426)!important;
+  border-color:#f97316!important;
 }
-.player-stat:nth-child(3) .num{
-  color:#ea580c!important;
-}
-.player-stat:nth-child(3) .icon-wrap{
-  background:#f97316!important;
-  color:white!important;
-  border-color:#f97316;
-}
+.player-stat:nth-child(3) .num{color:white!important}
+
 body.player-mode .card-head{
   border-top:2px solid rgba(249,115,22,.72);
 }
@@ -1077,6 +1053,53 @@ body.player-mode button:not(.secondary):not(.logout-btn){
 body.player-mode .badge.orange{
   background:#ffedd5;
   color:#c2410c;
+}
+
+/* Subtle stadium backdrop across the TOP app area, concentrated on the right.
+   It sits behind the existing logo/title/database badge and adds no height. */
+.header{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  border-radius:24px;
+  padding:8px 18px 8px 0;
+}
+.header::before{
+  content:"";
+  position:absolute;
+  z-index:-2;
+  top:-30px;
+  right:-10px;
+  width:min(72%,900px);
+  height:145px;
+  pointer-events:none;
+  opacity:.38;
+  background:
+    radial-gradient(circle at 76% 20%,rgba(255,255,255,.95) 0 2px,rgba(255,196,110,.65) 3px 5px,transparent 6px),
+    radial-gradient(circle at 82% 23%,rgba(255,255,255,.9) 0 2px,rgba(255,196,110,.6) 3px 5px,transparent 6px),
+    radial-gradient(circle at 88% 26%,rgba(255,255,255,.85) 0 2px,rgba(255,196,110,.55) 3px 5px,transparent 6px),
+    radial-gradient(ellipse at 72% 108%,transparent 0 43%,rgba(255,255,255,.16) 43.5% 44.5%,transparent 45%),
+    radial-gradient(ellipse at 72% 109%,transparent 0 60%,rgba(255,255,255,.1) 60.5% 61.5%,transparent 62%),
+    linear-gradient(162deg,transparent 0 55%,rgba(14,70,49,.28) 55.5% 70%,transparent 70.5%),
+    linear-gradient(180deg,rgba(14,41,72,.18),rgba(5,21,40,.02));
+}
+.header::after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:0;
+  bottom:0;
+  width:min(68%,860px);
+  height:55px;
+  pointer-events:none;
+  opacity:.28;
+  clip-path:polygon(0 100%,7% 46%,15% 78%,24% 34%,33% 73%,42% 40%,52% 78%,62% 35%,72% 71%,82% 42%,91% 75%,100% 34%,100% 100%);
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.14) 0 2px,transparent 2px 30px),
+    linear-gradient(0deg,rgba(255,120,31,.12),rgba(10,39,69,.36));
+}
+@media(max-width:700px){
+  .header::before,.header::after{opacity:.18;width:76%}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -4766,4 +4789,4 @@ document.addEventListener("pointerdown",(event)=>{
 boot();
 </script>
 </body>
-</html> 
+</html>
