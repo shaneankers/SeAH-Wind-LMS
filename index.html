@@ -1406,6 +1406,74 @@ body.player-mode .badge.orange{
  .buyback-admin-row{grid-template-columns:1fr}
  .buyback-admin-actions{justify-content:flex-start}
 }
+
+/* Mobile Live Football table: fit all columns inside screen width */
+@media(max-width:560px){
+ .live-table-wrap{
+   overflow-x:hidden;
+   width:100%;
+ }
+ .live-table{
+   width:100%;
+   min-width:0;
+   table-layout:fixed;
+ }
+ .live-table th,
+ .live-table td{
+   padding:7px 2px;
+   font-size:9px;
+   white-space:nowrap;
+ }
+ .live-table th{
+   font-size:8px;
+   letter-spacing:0;
+ }
+ .live-table th:nth-child(1),
+ .live-table td:nth-child(1){width:8%}
+ .live-table th:nth-child(2),
+ .live-table td:nth-child(2){width:42%}
+ .live-table th:nth-child(3),
+ .live-table td:nth-child(3),
+ .live-table th:nth-child(4),
+ .live-table td:nth-child(4),
+ .live-table th:nth-child(5),
+ .live-table td:nth-child(5),
+ .live-table th:nth-child(6),
+ .live-table td:nth-child(6){width:7%}
+ .live-table th:nth-child(7),
+ .live-table td:nth-child(7){width:10%}
+ .live-table th:nth-child(8),
+ .live-table td:nth-child(8){width:12%}
+
+ .live-table-team{
+   gap:4px;
+   min-width:0;
+   overflow:hidden;
+ }
+ .live-table-team span{
+   min-width:0;
+   overflow:hidden;
+   text-overflow:ellipsis;
+   white-space:nowrap;
+   font-size:10px;
+ }
+ .live-table .club-badge.small{
+   width:18px;
+   height:18px;
+   flex:0 0 18px;
+ }
+ .live-table .club-badge-fallback{
+   width:18px;
+   height:18px;
+   flex:0 0 18px;
+   font-size:7px;
+ }
+ .live-points,
+ .live-points strong{
+   font-size:10px!important;
+ }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
