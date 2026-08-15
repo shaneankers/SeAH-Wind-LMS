@@ -1529,6 +1529,83 @@ body.player-mode .badge.orange{
   }
 }
 
+
+/* ===== RESPONSIVE PHOTO BACKDROP FIT ===== */
+/* Desktop / large tablet: cinematic full-width photo */
+@media(min-width:901px){
+  .header{
+    min-height:140px!important;
+  }
+  .header::before{
+    background-size:cover!important;
+    background-position:center center!important;
+  }
+}
+
+/* Tablet: slightly looser crop */
+@media(min-width:601px) and (max-width:900px){
+  .header{
+    min-height:132px!important;
+  }
+  .header::before{
+    background-size:cover!important;
+    background-position:center center!important;
+  }
+}
+
+/* Phones: show the photo cleanly instead of aggressively cropping it */
+@media(max-width:600px){
+  .header{
+    min-height:150px!important;
+    background:
+      radial-gradient(circle at 80% 30%,rgba(249,115,22,.10),transparent 38%),
+      linear-gradient(135deg,#06111f,#0a1d31)!important;
+  }
+  .header::before{
+    background-image:
+      linear-gradient(90deg,rgba(2,13,29,.62) 0%,rgba(2,13,29,.34) 38%,rgba(2,13,29,.20) 100%),
+      var(--seah-header-photo)!important;
+    background-size:contain!important;
+    background-position:right center!important;
+    background-repeat:no-repeat!important;
+    opacity:1!important;
+  }
+  .header::after{
+    background:
+      linear-gradient(90deg,rgba(1,10,24,.82) 0%,rgba(1,10,24,.48) 42%,rgba(1,10,24,.10) 78%,rgba(1,10,24,.18) 100%)!important;
+  }
+}
+
+/* Very narrow phones */
+@media(max-width:390px){
+  .header{
+    min-height:158px!important;
+  }
+  .header::before{
+    background-size:auto 100%!important;
+    background-position:72% center!important;
+  }
+}
+
+/* Per-photo framing tweaks so each scene lands well on narrow screens */
+@media(max-width:600px){
+  .header[data-photo-backdrop="stadium"]::before{
+    background-position:72% center!important;
+  }
+  .header[data-photo-backdrop="dressing-room"]::before{
+    background-position:68% center!important;
+  }
+  .header[data-photo-backdrop="tactics-board"]::before{
+    background-position:62% center!important;
+  }
+  .header[data-photo-backdrop="football-shirts"]::before{
+    background-position:70% center!important;
+  }
+  .header[data-photo-backdrop="training-pitch"]::before{
+    background-position:64% center!important;
+  }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
