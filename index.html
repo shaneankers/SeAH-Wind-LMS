@@ -1496,6 +1496,70 @@ body.player-mode .badge.orange{
 @media(max-width:600px){
  .header{min-height:175px!important;padding:16px 14px!important;border-radius:18px!important;background-size:auto 100%!important;background-position:center 50%!important}
 }
+
+/* v107 - tidy notification status on Admin > Players */
+.player-list-row.status-line{
+  grid-template-columns:minmax(150px,1fr) auto auto !important;
+  gap:10px !important;
+  padding:10px 12px !important;
+}
+.player-status-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  flex-wrap:nowrap;
+  min-width:0;
+}
+.player-list-row.status-line .notification-badge{
+  white-space:nowrap !important;
+}
+.notification-nudge{
+  appearance:none;
+  border:0;
+  background:#f59e0b;
+  color:#111827;
+  font-weight:900;
+  font-size:10px;
+  line-height:1;
+  padding:6px 8px;
+  border-radius:8px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.notification-nudge:hover{filter:brightness(.96)}
+.player-list-row.status-line .player-edit-button{
+  width:auto !important;
+  min-width:42px !important;
+  margin:0 !important;
+}
+@media(max-width:700px){
+  .player-list-row.status-line{
+    grid-template-columns:minmax(110px,1fr) auto !important;
+    gap:7px !important;
+  }
+  .player-status-actions{
+    grid-column:1/-1;
+    grid-row:2;
+    justify-content:flex-start;
+    flex-wrap:wrap;
+    gap:5px;
+  }
+  .player-list-row.status-line .player-edit-button{
+    grid-column:2;
+    grid-row:1;
+    justify-self:end;
+  }
+  .player-list-row.status-line .badge{
+    font-size:9px !important;
+    padding:4px 6px !important;
+  }
+  .notification-nudge{
+    font-size:9px;
+    padding:5px 7px;
+  }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -2965,11 +3029,13 @@ function players(){
    <div class="card-body list">
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
        <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
-       <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
-       <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
-       <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
-       ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls}" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="small yellow" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
-       <button class="small edit-only" onclick="toggleEditPanel(${i})">Edit</button>
+       <div class="player-status-actions">
+         <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
+         <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
+         <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
+         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="notification-nudge" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
+       </div>
+       <button class="small edit-only player-edit-button" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Login username:</strong> ${escapeHtml(p.username||"Not available")}</div>
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Display name:</strong> ${escapeHtml(p.name||"Not available")}</div>
