@@ -2711,12 +2711,29 @@ async function notifyGroup(type,targets,message,templateData={}){
 }
 
 async function sendAutomaticPlayerPush(player,title,message,eventType="status",extra={}){
- if(!player||!player.id||player.notifications===false)return false;
+ if(!player||!player.id)return false;
+
+ if(player.notifications===false){
+  try{
+   addActivity("notify",`⏭️ Push skipped: ${player.name}`,`${eventType} • Player notifications are OFF`);
+   await dbSaveActivityLog();
+  }catch(e){console.warn("Push skip audit log failed",e);}
+  return false;
+ }
+
  const setting=autoNotificationSetting(eventType);
- if(setting&&setting.enabled===false)return false;
+ if(setting&&setting.enabled===false){
+  try{
+   addActivity("notify",`⏭️ Push skipped: ${player.name}`,`${eventType} • Automatic notification is disabled in Admin Settings`);
+   await dbSaveActivityLog();
+  }catch(e){console.warn("Push skip audit log failed",e);}
+  return false;
+ }
+
  const finalMessage=setting?.message
   ?renderAutomaticNotificationMessage(setting.message,player,extra)
   :renderAutomaticNotificationMessage(message,player,extra);
+
  try{
   const response=await fetch(PUSH_FUNCTION_URL,{
    method:"POST",
@@ -2747,12 +2764,29 @@ async function sendAutomaticPlayerPush(player,title,message,eventType="status",e
     `No notification was delivered (sent ${Number(data?.sent||0)}, failed ${Number(data?.failed||0)}).`;
    throw new Error(detail);
   }
+
+  try{
+   addActivity(
+    "notify",
+    `✅ Push sent: ${player.name}`,
+    `${eventType} • Edge Function confirmed sent ${Number(data.sent||0)}, failed ${Number(data.failed||0)}`
+   );
+   await dbSaveActivityLog();
+  }catch(e){console.warn("Push success audit log failed",e);}
+
   return true;
  }catch(e){
+  const detail=e?.message||String(e)||"unknown error";
   console.warn("Automatic player push was not delivered",eventType,player.name,e);
+
+  try{
+   addActivity("notify",`❌ Push failed: ${player.name}`,`${eventType} • ${detail}`);
+   await dbSaveActivityLog();
+  }catch(logErr){console.warn("Push failure audit log failed",logErr);}
+
   const silentFailure=extra&&extra._silentFailure===true;
   if(authUser&&authUser.role==="admin"&&!silentFailure){
-   toast(`Status saved, but notification failed: ${e.message||"unknown error"}`);
+   toast(`Status saved, but notification failed: ${detail}`);
   }
   return false;
  }
@@ -3030,10 +3064,10 @@ function players(){
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
        <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="player-status-actions">
+         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="notification-nudge" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
          <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
          <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
          <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
-         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="notification-nudge" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
        </div>
        <button class="small edit-only player-edit-button" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
