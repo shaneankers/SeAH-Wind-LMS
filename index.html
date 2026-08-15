@@ -1558,6 +1558,79 @@ body.player-mode .badge.orange{
   }
 }
 
+
+/* ===== NEW INDEPENDENT FOOTBALL BACKDROPS =====
+   Old composite/mockup imagery is overridden completely. */
+.header {
+  position:relative!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  min-height:220px!important;
+  padding:30px!important;
+  border-radius:24px!important;
+  background-color:#061426!important;
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center!important;
+}
+.header::before,
+.header::after {
+  content:none!important;
+  display:none!important;
+}
+
+.header[data-photo="stadium"] {
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.84) 0%,rgba(2,13,29,.40) 34%,rgba(2,13,29,.10) 72%),
+    url("https://i.imgur.com/GFSpVZf.jpeg")!important;
+  background-position:center 55%!important;
+}
+.header[data-photo="dressing-room"] {
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.84) 0%,rgba(2,13,29,.40) 34%,rgba(2,13,29,.10) 72%),
+    url("https://fcbusiness.co.uk/wp-content/uploads/2024/02/Bristol-Rovers-FC-Football-Lockers-Crown-Sports-Lockers.png")!important;
+  background-position:center 50%!important;
+}
+.header[data-photo="tactics-board"] {
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.84) 0%,rgba(2,13,29,.36) 34%,rgba(2,13,29,.08) 72%),
+    url("https://img.redbull.com/images/c_limit,w_1500,h_1000/f_auto,q_auto/redbullcom/2019/10/15/e553e12b-6a1e-4cbd-bf56-bad8e9b47f23/formacja-pilkarska-fut20")!important;
+  background-position:center 52%!important;
+}
+.header[data-photo="football-shirts"] {
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.84) 0%,rgba(2,13,29,.40) 34%,rgba(2,13,29,.10) 72%),
+    url("https://images.virginexperiencedays.co.uk/images/product/large/wycombe-wanderers-fc-matchday-27105134.jpg?auto=compress%2Cformat&fit=max&q=80&w=1440")!important;
+  background-position:center 47%!important;
+}
+.header[data-photo="training-pitch"] {
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.84) 0%,rgba(2,13,29,.38) 34%,rgba(2,13,29,.08) 72%),
+    url("https://mlmbqcss2lv7.i.optimole.com/w:auto/h:auto/q:90/f:avif/https:/www.sispitches.com/wp-content/uploads/2016/11/St-Geroges-Park-National-Football-Centre-SISGrass-2016.jpg")!important;
+  background-position:center 58%!important;
+}
+
+@media (max-width:999px) {
+  .header {
+    min-height:190px!important;
+    padding:24px 20px!important;
+    background-size:cover!important;
+  }
+}
+@media (max-width:600px) {
+  .header {
+    min-height:175px!important;
+    padding:18px 15px!important;
+    border-radius:18px!important;
+    background-size:cover!important;
+  }
+  .header[data-photo="stadium"] {background-position:center 55%!important}
+  .header[data-photo="dressing-room"] {background-position:center 50%!important}
+  .header[data-photo="tactics-board"] {background-position:center 52%!important}
+  .header[data-photo="football-shirts"] {background-position:center 48%!important}
+  .header[data-photo="training-pitch"] {background-position:center 58%!important}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
