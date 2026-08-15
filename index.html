@@ -1474,6 +1474,36 @@ body.player-mode .badge.orange{
  }
 }
 
+
+/* Rotating photographic football header backdrops */
+.header{
+  --header-photo:url("assets/backdrops/stadium.jpg");
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+}
+.header::before{
+  background-image:
+    linear-gradient(90deg,rgba(2,13,29,.78) 0%,rgba(2,13,29,.45) 30%,rgba(2,13,29,.12) 68%,rgba(2,13,29,.22) 100%),
+    var(--header-photo)!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  opacity:.92!important;
+  filter:saturate(.92) contrast(1.04)!important;
+}
+.header::after{
+  background:linear-gradient(90deg,rgba(1,10,24,.48) 0%,rgba(1,10,24,.20) 45%,rgba(1,10,24,.10) 75%,rgba(1,10,24,.22) 100%)!important;
+}
+.header[data-photo-backdrop="stadium"]{--header-photo:url("assets/backdrops/stadium.jpg")}
+.header[data-photo-backdrop="dressing-room"]{--header-photo:url("assets/backdrops/dressing-room.jpg")}
+.header[data-photo-backdrop="tactics-board"]{--header-photo:url("assets/backdrops/tactics-board.jpg")}
+.header[data-photo-backdrop="football-shirts"]{--header-photo:url("assets/backdrops/football-shirts.jpg")}
+.header[data-photo-backdrop="training-pitch"]{--header-photo:url("assets/backdrops/training-pitch.jpg")}
+@media(max-width:700px){
+  .header::before{background-position:center!important;opacity:.80!important}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -2273,6 +2303,7 @@ async function completeForcedPasswordReset(){
 }
 
 function logout(){
+ try{sessionStorage.removeItem(PHOTO_BACKDROP_SESSION_KEY);}catch(e){}
  stopAdminBuyBackWatch();authUser=null;currentUserId=null;clearStoredAuthUser();page="dashboard";renderAuth()}
 function ensureAdminPlayer(){
  let p=(authUser&&authUser.user_id)?state.players.find(x=>x.id===authUser.user_id):null;
@@ -2304,6 +2335,7 @@ function switchAdminView(view){
 }
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","⚽ Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
+ choosePhotoBackdrop(false);
  document.body.classList.toggle("player-mode",role==="player");
  document.body.classList.toggle("admin-mode",role==="admin");
  ensureLeagues();
@@ -5741,6 +5773,40 @@ async function saveNow(){
  return true;
 }
 
+
+const PHOTO_BACKDROPS=[
+ "stadium",
+ "dressing-room",
+ "tactics-board",
+ "football-shirts",
+ "training-pitch"
+];
+const PHOTO_BACKDROP_SESSION_KEY="seah_photo_backdrop_session";
+const PHOTO_BACKDROP_LAST_KEY="seah_photo_backdrop_last";
+
+function applyPhotoBackdrop(name){
+ const header=document.querySelector(".header");
+ if(header)header.dataset.photoBackdrop=PHOTO_BACKDROPS.includes(name)?name:"stadium";
+}
+function choosePhotoBackdrop(forceNew=false){
+ try{
+  let choice=!forceNew?sessionStorage.getItem(PHOTO_BACKDROP_SESSION_KEY):null;
+  if(!choice||!PHOTO_BACKDROPS.includes(choice)){
+   const previous=localStorage.getItem(PHOTO_BACKDROP_LAST_KEY)||"";
+   const options=PHOTO_BACKDROPS.filter(x=>x!==previous);
+   choice=options[Math.floor(Math.random()*options.length)]||"stadium";
+   sessionStorage.setItem(PHOTO_BACKDROP_SESSION_KEY,choice);
+   localStorage.setItem(PHOTO_BACKDROP_LAST_KEY,choice);
+  }
+  applyPhotoBackdrop(choice);
+ }catch(e){
+  applyPhotoBackdrop("stadium");
+ }
+}
+function rotatePhotoBackdropAfterLogin(){
+ try{sessionStorage.removeItem(PHOTO_BACKDROP_SESSION_KEY);}catch(e){}
+ choosePhotoBackdrop(true);
+}
 async function loginUser(){
  const name=document.getElementById("loginName").value.trim();
  const pin=document.getElementById("loginPin").value.trim();
@@ -5761,6 +5827,7 @@ async function loginUser(){
  try{
   authUser={name:u.display_name,username:u.username,role:u.role,user_id:u.user_id,must_reset_password:!!u.must_reset_password,notifications_enabled:u.notifications_enabled===false?false:true};
   currentUserId=u.user_id;
+  rotatePhotoBackdropAfterLogin();
   storeAuthUser(authUser,remember);
   saveRememberedUsername(u.username||name,remember);
   if(u.role==="admin"){
@@ -5798,6 +5865,7 @@ async function loginAdmin(){
   if(!data||!data.length||data[0].role!=="admin")return toast("Incorrect admin login.");
   authUser={name:data[0].display_name,username:data[0].username,role:"admin",user_id:data[0].user_id,must_reset_password:!!data[0].must_reset_password,notifications_enabled:data[0].notifications_enabled===false?false:true};
   currentUserId=data[0].user_id;
+  rotatePhotoBackdropAfterLogin();
   storeAuthUser(authUser,true);
   await loadAppSettingsFromSupabase();
   await loadAnnouncementDismissalsForUser();
