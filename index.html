@@ -2580,7 +2580,8 @@ async function sendAutomaticPlayerPush(player,title,message,eventType="status",e
   return true;
  }catch(e){
   console.warn("Automatic player push was not delivered",eventType,player.name,e);
-  if(authUser&&authUser.role==="admin"){
+  const silentFailure=extra&&extra._silentFailure===true;
+  if(authUser&&authUser.role==="admin"&&!silentFailure){
    toast(`Status saved, but notification failed: ${e.message||"unknown error"}`);
   }
   return false;
@@ -2820,7 +2821,7 @@ function round(){
           ?"🔄 Start Rollover"
           :"Start Next Round";
    return `<div class="actions">
-    <button class="yellow" onclick="processInputtedResults()">Process Inputted Results</button>
+    <button class="yellow" onclick="processInputtedResults()" ${processResultsBusy?"disabled":""}>${processResultsBusy?"Processing…":"Process Inputted Results"}</button>
     <button class="secondary" onclick="startNextRound()" ${(roundTransitionBusy||championConfirmed)?"disabled":""}>${roundButtonLabel}</button>
     <button class="secondary" onclick="startNextCompetition()" ${competitionTransitionBusy?"disabled":""}>${competitionTransitionBusy?"Starting Competition…":"Start New Competition"}</button>
    </div>
@@ -4659,18 +4660,52 @@ async function resetPlayerPassword(i){
 }
 
 async function setPick(i,v){const p=state.players[i];const old=p.pick;p.pick=v;if(v&&v!==old)addActivity("pick",p.name+" picked "+v,"Admin updated Round "+state.round+" pick");await saveNow()}
+let teamResultBusy=false;
 async function setResult(i,v){
  const source=state.players[i];
  if(!source)return toast("Player not found.");
+ if(teamResultBusy)return toast("A team result is already being saved. Please wait.");
  if(source.result==="processed_win")return toast("That result has already been processed.");
+
  const team=String(source.pick||"").trim();
- if(!team){source.result=v;await saveNow();return;}
- const affected=state.players.filter(p=>p&&p.approved&&p.alive&&String(p.pick||"").trim()===team&&p.result!=="processed_win"&&p.result!=="waiting_next_round");
- affected.forEach(p=>p.result=v);
- addActivity("round",team+" marked "+(v==="win"?"WIN":v==="lose"?"LOSS":"pending"),affected.length+" pick"+(affected.length===1?"":"s")+" updated automatically");
- await saveNow();
- toast(`${team}: ${affected.length} pick${affected.length===1?"":"s"} updated.`);
+ if(!team)return toast("That player does not currently have a team pick.");
+
+ if(!["pending","win","lose"].includes(v))return toast("Invalid result.");
+
+ teamResultBusy=true;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_set_team_result_atomic",{
+   p_admin_user_id:authUser.user_id,
+   p_team:team,
+   p_result:v
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Team result was not saved.");
+
+  await syncUsersFromSupabase();
+
+  addActivity(
+   "round",
+   team+" marked "+(v==="win"?"WIN":v==="lose"?"LOSS":"pending"),
+   `${Number(result.affected_count||0)} pick${Number(result.affected_count||0)===1?"":"s"} updated atomically`
+  );
+  try{await dbSaveActivityLog();}catch(e){console.warn("Team result activity log save failed",e);}
+
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  toast(`${team}: ${Number(result.affected_count||0)} pick${Number(result.affected_count||0)===1?"":"s"} updated.`);
+ }catch(e){
+  console.error("Atomic team result update failed",e);
+  await syncUsersFromSupabase();
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  toast("Team result was NOT changed: "+(e.message||"unknown error"));
+ }finally{
+  teamResultBusy=false;
+ }
 }
+
 function chooseTempPick(v){window.tempPick=v;render()}
 async function confirmPlayerPick(){
  const p=currentPlayer();
@@ -4730,38 +4765,95 @@ async function recordPartialRoundStatistics(players){
  return true;
 }
 
+let processResultsBusy=false;
 async function processInputtedResults(){
- const candidates=alive().filter(p=>p.result==="win"||p.result==="lose");
- if(!candidates.length)return toast("No new 🟩 or 🟥 results have been inputted.");
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(processResultsBusy)return toast("Results are already being processed. Please wait.");
+
+ const localCandidates=alive().filter(p=>p.result==="win"||p.result==="lose");
+ if(!localCandidates.length)return toast("No new 🟩 or 🟥 results have been inputted.");
 
  const byTeam=new Map(),conflicts=[];
- candidates.forEach(p=>{const team=String(p.pick||"").trim();if(!team)return;const prev=byTeam.get(team);if(prev&&prev!==p.result)conflicts.push(team);byTeam.set(team,p.result);});
+ localCandidates.forEach(p=>{
+  const team=String(p.pick||"").trim();
+  if(!team)return;
+  const prev=byTeam.get(team);
+  if(prev&&prev!==p.result)conflicts.push(team);
+  byTeam.set(team,p.result);
+ });
  if(conflicts.length)return toast("Result mismatch for: "+[...new Set(conflicts)].join(", "));
 
- const snapshot=candidates.map(p=>({player:p,result:p.result,pick:p.pick}));
+ processResultsBusy=true;
+ render();
+
  try{
-  await recordPartialRoundStatistics(candidates);
-  candidates.forEach(p=>{
-   if(p.pick&&!p.previous.includes(p.pick))p.previous.push(p.pick);
-   if(p.result==="lose"){p.alive=false;p.outRound=state.round;p.outPick=p.pick||"No Pick";p.result="lose";p.locked=true;}
-   else{p.result="processed_win";p.locked=true;}
+  const {data,error}=await supabaseClient.rpc("admin_process_inputted_results_atomic",{
+   p_admin_user_id:authUser.user_id
   });
-  addActivity("round","Inputted results processed",`${candidates.length} player result${candidates.length===1?"":"s"} processed in Round ${state.round}`);
-  await saveNow();
+  if(error)throw error;
+
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Results were not processed.");
+
+  const processed=Array.isArray(result.processed)?result.processed:[];
+  const processedCount=Number(result.processed_count||processed.length||0);
+
+  // Reload the committed database truth before doing anything non-critical.
+  await syncUsersFromSupabase();
+  await loadBuyBackData(false);
   await loadTeamStatistics(false);
-  for(const item of snapshot){
-   const p=item.player;
-   if(item.result==="win")await sendAutomaticPlayerPush(p,"🟩 YOU'RE THROUGH!",`Your ${item.pick} pick won. You remain alive in the competition.`,"result_win",{team:item.pick});
-   else await sendAutomaticPlayerPush(p,"❌ Eliminated",Number(state.round)===1?`Your ${item.pick||"Round 1"} pick has lost. You are eliminated, but a £${state.entryFee} Round 1 buy-back is available in the app.`:`Your ${item.pick||"team"} pick has lost and you have been eliminated from the competition.`,Number(state.round)===1?"round1_eliminated":"eliminated",{team:item.pick});
+
+  addActivity(
+   "round",
+   "Inputted results processed",
+   `${processedCount} player result${processedCount===1?"":"s"} processed atomically in Round ${state.round}`
+  );
+  try{await dbSaveActivityLog();}catch(e){console.warn("Result activity log save failed",e);}
+
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  toast(`${processedCount} inputted result${processedCount===1?"":"s"} processed. Round ${state.round} remains open.`);
+
+  // Notifications are best-effort AFTER the transaction has committed.
+  // A dead/missing push subscription can never make result processing fail.
+  for(const item of processed){
+   const p=state.players.find(x=>String(x.id)===String(item.user_id));
+   if(!p)continue;
+   if(item.outcome==="win"){
+    await sendAutomaticPlayerPush(
+     p,
+     "🟩 YOU'RE THROUGH!",
+     `Your ${item.team} pick won. You remain alive in the competition.`,
+     "result_win",
+     {team:item.team,_silentFailure:true}
+    );
+   }else{
+    await sendAutomaticPlayerPush(
+     p,
+     "❌ Eliminated",
+     Number(state.round)===1
+      ?`Your ${item.team||"Round 1"} pick has lost. You are eliminated, but a £${state.entryFee} Round 1 buy-back is available in the app.`
+      :`Your ${item.team||"team"} pick has lost and you have been eliminated from the competition.`,
+     Number(state.round)===1?"round1_eliminated":"eliminated",
+     {team:item.team,_silentFailure:true}
+    );
+   }
   }
-  toast(`${candidates.length} inputted result${candidates.length===1?"":"s"} processed. Round ${state.round} remains open.`);
-  await loadBuyBackData(false);render();
  }catch(e){
-  console.error("Partial result processing failed",e);
-  toast("Results were not processed: "+(e.message||"unknown error"));
-  await syncUsersFromSupabase();render();
+  console.error("Atomic result processing failed",e);
+  try{
+   await syncUsersFromSupabase();
+   await loadBuyBackData(false);
+  }catch(syncErr){console.warn("Could not refresh after failed result processing",syncErr);}
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+  toast("Results were NOT processed: "+(e.message||"unknown error"));
+ }finally{
+  processResultsBusy=false;
+  render();
  }
 }
+
 
 let roundTransitionBusy=false;
 
