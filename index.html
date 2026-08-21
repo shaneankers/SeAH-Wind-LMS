@@ -1946,8 +1946,6 @@ function purgeLocalPlayersNotInSupabase(validUserIds,validUsernames){
 async function syncUsersFromSupabase(){
  try{
   if(!supabaseClient)return false;
-  if(!onlineReady)setOnlineStatus(true,"Database connected");
-
   const usersRes=await supabaseClient
    .from("app_users")
    .select("id,username,display_name,role,approved,notifications_enabled,contact_number")
@@ -1968,14 +1966,12 @@ async function syncUsersFromSupabase(){
    changed=true;
   }
 
-  // If this device is still logged in as a deleted account, clear the stale login.
+  // v114 SESSION SAFETY:
+  // A normal background sync must NEVER clear a player's saved login.
+  // If the current account is missing from one bulk response, keep the session
+  // and simply log the anomaly. Manual Logout remains the only normal logout path.
   if(authUser&&authUser.user_id&&!validUserIds.has(authUser.user_id)){
-   authUser=null;
-   currentUserId=null;
-   clearStoredAuthUser();
-   localStorage.setItem(storeKey,JSON.stringify(state));
-   setTimeout(()=>renderAuth(),0);
-   return true;
+   console.warn("Current logged-in account was not present in this user sync; session preserved.",authUser.user_id);
   }
 
   let stateRows=[];
@@ -2110,6 +2106,7 @@ async function syncUsersFromSupabase(){
   });
 
   if(changed)localStorage.setItem(storeKey,JSON.stringify(state));
+  setOnlineStatus(true,"Database connected");
   return changed;
  }catch(e){
   console.error("Could not sync users from Supabase",e);
@@ -2245,9 +2242,61 @@ function renderAuth(){
  }
  app.style.display="none";login.style.display="block";
  const remembered=rememberedUsername();
- login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="openForgotUsername()">Forgot your username? View current player accounts</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
+
+let forgotUsernameRows=[];
+
+async function openForgotUsername(){
+ const existing=document.getElementById("forgotUsernameModal");
+ if(existing){existing.remove();return;}
+
+ const overlay=document.createElement("div");
+ overlay.id="forgotUsernameModal";
+ overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.78);z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px";
+ overlay.innerHTML=`<div style="width:min(560px,100%);max-height:82vh;background:white;border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.4);display:flex;flex-direction:column;overflow:hidden">
+   <div style="padding:20px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div><div style="font-size:21px;font-weight:950;color:#0f172a">Forgot your username?</div><div style="font-size:13px;color:#64748b;margin-top:4px">Search by display name or username, or scroll through current player accounts.</div></div>
+    <button class="secondary small" onclick="closeForgotUsername()">Close</button>
+   </div>
+   <div style="padding:0 20px 12px"><input id="forgotUsernameSearch" placeholder="Search display name or username..." oninput="filterForgotUsernameList()" autocomplete="off"></div>
+   <div id="forgotUsernameResults" style="padding:0 20px 20px;overflow:auto;min-height:120px"><div class="notice">Loading current accounts...</div></div>
+  </div>`;
+ document.body.appendChild(overlay);
+
+ try{
+  const {data,error}=await supabaseClient
+   .from("app_users")
+   .select("username,display_name,role")
+   .eq("role","player")
+   .order("display_name",{ascending:true});
+  if(error)throw error;
+  forgotUsernameRows=(Array.isArray(data)?data:[])
+   .filter(r=>String(r.username||"").trim())
+   .map(r=>({username:String(r.username||"").trim(),displayName:String(r.display_name||r.username||"").trim()}));
+  filterForgotUsernameList();
+ }catch(e){
+  console.error("Username directory load failed",e);
+  const el=document.getElementById("forgotUsernameResults");
+  if(el)el.innerHTML=`<div class="notice">Could not load the username list right now. Please try again when you have a connection.</div>`;
+ }
+}
+function closeForgotUsername(){
+ const el=document.getElementById("forgotUsernameModal");
+ if(el)el.remove();
+}
+function filterForgotUsernameList(){
+ const q=String(document.getElementById("forgotUsernameSearch")?.value||"").trim().toLowerCase();
+ const rows=forgotUsernameRows.filter(r=>!q||r.username.toLowerCase().includes(q)||r.displayName.toLowerCase().includes(q));
+ const el=document.getElementById("forgotUsernameResults");
+ if(!el)return;
+ el.innerHTML=rows.length?rows.map(r=>`<div style="border:1px solid #e2e8f0;border-radius:14px;padding:11px 13px;margin-bottom:8px;background:#fff">
+   <div style="font-weight:950;color:#0f172a">${escapeHtml(r.displayName)}</div>
+   <div style="font-size:12px;color:#64748b;margin-top:3px">Username: <strong style="color:#0f172a">${escapeHtml(r.username)}</strong></div>
+  </div>`).join(""):`<div class="notice">No matching player accounts.</div>`;
+}
+
 async function saveAdminAccount(){
  const username=(document.getElementById("adminUsername")?.value||"").trim();
  const password=(document.getElementById("adminPassword")?.value||"").trim();
@@ -2552,15 +2601,63 @@ function activityTimeLabel(iso){
  const days=Math.floor(hrs/24);
  return days+"d ago";
 }
+
+// v110: Latest News is a PLAYER feed, not the admin audit log.
+// Keep operational/admin diagnostics in Admin > Recent Activity only.
+function playerVisibleActivity(entry){
+ const a=normaliseActivityEntry(entry);
+ const title=String(a.title||"").toLowerCase();
+ const detail=String(a.detail||"").toLowerCase();
+
+ // Player Latest News contains ONLY:
+ // picks, round/competition processing, buy-backs and approvals.
+ if(a.type==="pick")return true;
+
+ if(a.type==="round"){
+  // Exclude individual team WIN/LOSS status changes.
+  if(title.includes(" marked win")||title.includes(" marked loss"))return false;
+
+  // Keep round and competition processing/start events.
+  if(title.includes("competition #")&&title.includes("started"))return true;
+  if(title.includes("results processed"))return true;
+  if(title.includes("round")&&(
+    title.includes("processed")||
+    title.includes("completed")||
+    title.includes("started")||
+    title.includes("advanced")
+  ))return true;
+  if(detail.includes("round")&&(
+    detail.includes("processed")||
+    detail.includes("completed")||
+    detail.includes("started")||
+    detail.includes("advanced")
+  ))return true;
+ }
+
+ // Keep buy-back activity.
+ if(title.includes("buy-back")||title.includes("buy back")||
+    detail.includes("buy-back")||detail.includes("buy back"))return true;
+
+ // Keep player approvals, but not unrelated account/admin management.
+ if(title.includes(" approved")||title.startsWith("approved ")||
+    detail.includes("player approved")||detail.includes("account approved"))return true;
+
+ // Everything else is admin-only.
+ return false;
+}
+function getPlayerNewsActivities(){
+ ensureActivityLog();
+ return (state.activityLog||[]).filter(playerVisibleActivity);
+}
 function getAdminActivityLimit(){
  ensureActivityLog();
  const limit=Number(window.__adminActivityLimit||ADMIN_ACTIVITY_START);
  return Math.min(limit,state.activityLog.length);
 }
 function getPlayerNewsLimit(){
- ensureActivityLog();
+ const visible=getPlayerNewsActivities();
  const limit=Number(window.__playerNewsLimit||PLAYER_NEWS_START);
- return Math.min(limit,state.activityLog.length);
+ return Math.min(limit,visible.length);
 }
 function showMoreAdminActivity(){
  ensureActivityLog();
@@ -2572,8 +2669,8 @@ function showLessAdminActivity(){
  render();
 }
 function showMorePlayerNews(){
- ensureActivityLog();
- window.__playerNewsLimit=Math.min(getPlayerNewsLimit()+ACTIVITY_CHUNK,state.activityLog.length);
+ const visible=getPlayerNewsActivities();
+ window.__playerNewsLimit=Math.min(getPlayerNewsLimit()+ACTIVITY_CHUNK,visible.length);
  render();
 }
 function showLessPlayerNews(){
@@ -2887,10 +2984,11 @@ function notifyRollover(){
  return notifyGroup("rollover",targets,noteText("rollover"));
 }
 
-function renderActivityRows(limit){
+function renderActivityRows(limit,source){
  ensureActivityLog();
- const visible=(state.activityLog||[]).slice(0,limit);
- return visible.length?visible.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${escapeHtml(a.title||"Activity")}</div><div class="activity-sub">${escapeHtml(a.detail||"")}</div></div></div><div class="activity-time">${escapeHtml(activityTimeLabel(a.time))}</div></div>`).join(""):`<div class="notice">No activity yet.</div>`;
+ const list=Array.isArray(source)?source:(state.activityLog||[]);
+ const visible=list.slice(0,limit);
+ return visible.length?visible.map(a=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon(a.type)}</div><div><div class="activity-main">${escapeHtml(a.title||"Activity")}</div><div class="activity-sub">${escapeHtml(a.detail||"")}</div></div></div><div class="activity-time">${escapeHtml(activityTimeLabel(a.time))}</div></div>`).join(""):`<div class="notice">No player news yet.</div>`;
 }
 
 function dashboard(){
@@ -2930,7 +3028,7 @@ function dashboard(){
   <div class="pro-card">
    <div class="pro-head"><div class="pro-title"><span class="icon-wrap small">${appIcon('check')}</span>Recent Activity</div><span class="badge orange">${state.activityLog.length}</span></div>
    <div class="activity-list">
-    ${renderActivityRows(getAdminActivityLimit())}
+    ${(state.activityLog||[]).length?renderActivityRows(getAdminActivityLimit()):`<div class="notice">No activity yet.</div>`}
    </div>
    ${(state.activityLog||[]).length?`<div class="activity-clear-zone"><button class="small red" onclick="resetRecentActivity()">Clear Activity</button><div class="activity-clear-note">This clears the activity/news feed only.<br>Players, picks, payments and competition data are not affected.</div></div>`:""}
    <div class="activity-controls">
@@ -2978,65 +3076,148 @@ async function nudgeNotificationSetup(i){
   toast("Could not send nudge: "+(e.message||"Run the notification nudge SQL setup first."));
  }
 }
-async function checkNotificationSetupNudge(){
+async function checkNotificationSetupNudge(forceChoice=false){
  if(document.getElementById("notificationNudgeModal"))return;
  if(!authUser||authUser.role==="admin"||!authUser.user_id||!supabaseClient)return;
  try{
-  const {data,error}=await supabaseClient.rpc("get_my_notification_nudge",{p_user_id:authUser.user_id});
-  if(error){
+  let row=null;
+  if(!forceChoice){
+   const {data,error}=await supabaseClient.rpc("get_my_notification_nudge",{p_user_id:authUser.user_id});
+   if(error){
    const msg=String(error.message||"").toLowerCase();
    if(msg.includes("get_my_notification_nudge")||msg.includes("could not find the function"))return;
-   throw error;
+    throw error;
+   }
+   row=Array.isArray(data)?data[0]:data;
+   if(!row||row.pending!==true)return;
   }
-  const row=Array.isArray(data)?data[0]:data;
-  if(!row||row.pending!==true)return;
 
+  // v114: an admin nudge OR a brand-new account is a mandatory CHOICE.
+  // Players may enable or decline notifications, but cannot dismiss this screen
+  // without recording one of those two choices.
   const overlay=document.createElement("div");
   overlay.id="notificationNudgeModal";
-  overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.72);z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px";
-  overlay.innerHTML=`<div style="width:min(520px,100%);background:white;border-radius:22px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.35)">
-   <div style="font-size:22px;font-weight:950;color:#0f172a;margin-bottom:10px">🔔 Notification setup</div>
-   <div style="color:#475569;line-height:1.55;margin-bottom:18px">The competition admin has asked you to choose whether you want app notifications. These can include payment confirmations, pick reminders and round-result updates.</div>
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px";
+  overlay.innerHTML=`<div style="width:min(540px,100%);background:white;border-radius:22px;padding:26px;box-shadow:0 24px 70px rgba(0,0,0,.4)">
+   <div style="font-size:23px;font-weight:950;color:#0f172a;margin-bottom:10px">Stay updated with your competition</div>
+   <div style="color:#475569;line-height:1.55;margin-bottom:12px">Get notified when your payment is confirmed, your pick wins or loses, and when you need to make your next pick.</div>
+   <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;color:#64748b;font-size:12px;line-height:1.4;margin-bottom:18px">Choose an option to continue. You can change your notification preference later in Settings.</div>
+   <div id="notificationChoiceError" style="display:none;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
    <div style="display:flex;gap:10px;flex-wrap:wrap">
-    <button id="nudgeEnableBtn" style="flex:1;min-width:170px">Enable notifications</button>
-    <button id="nudgeDeclineBtn" class="secondary" style="flex:1;min-width:170px">No thanks</button>
+    <button id="nudgeEnableBtn" style="flex:1;min-width:210px;font-weight:950">🔔 Keep me updated</button>
+    <button id="nudgeDeclineBtn" class="secondary" style="flex:0 1 135px;min-width:120px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0">No thanks</button>
    </div>
   </div>`;
   document.body.appendChild(overlay);
 
+  // Prevent escape/backdrop clicks from bypassing the required choice.
+  overlay.onclick=(e)=>{ if(e.target===overlay)e.stopPropagation(); };
+
+  const showChoiceError=(msg)=>{
+   const el=document.getElementById("notificationChoiceError");
+   if(!el)return;
+   el.textContent=msg;
+   el.style.display="block";
+  };
+  const setBusy=(busy)=>{
+   const yes=document.getElementById("nudgeEnableBtn");
+   const no=document.getElementById("nudgeDeclineBtn");
+   if(yes)yes.disabled=busy;
+   if(no)no.disabled=busy;
+  };
+
   document.getElementById("nudgeEnableBtn").onclick=async()=>{
+   setBusy(true);
    try{
+    // Browser permission must actually be granted before we resolve the nudge.
+    if(!("Notification" in window))throw new Error("This browser does not support notifications.");
+
+    let permission=Notification.permission;
+    if(permission!=="granted"){
+     permission=await Notification.requestPermission();
+    }
+    if(permission!=="granted"){
+     showChoiceError(
+      permission==="denied"
+       ?"Notifications are currently blocked on this device. Allow notifications for SeAH Wind LMS in your browser/app settings, then tap Try Again."
+       :"Notifications weren't enabled. Tap Try Again, or choose No thanks."
+     );
+     const retryBtn=document.getElementById("nudgeEnableBtn");
+     if(retryBtn)retryBtn.textContent="🔄 Try Again";
+     return;
+    }
+
     await forceEnableNotificationsForLoggedInUser();
-    await registerPushSubscription();
-    await supabaseClient.rpc("resolve_my_notification_nudge",{p_user_id:authUser.user_id,p_enabled:true});
+    const registered=await registerPushSubscription();
+
+    // Confirm that this user now has a real stored subscription before showing ON.
+    const {data:subs,error:subErr}=await supabaseClient
+     .from("push_subscriptions")
+     .select("id")
+     .eq("user_id",authUser.user_id)
+     .limit(1);
+    if(subErr)throw subErr;
+    if(!Array.isArray(subs)||subs.length<1){
+     throw new Error("Permission was granted, but this device could not be registered for push notifications.");
+    }
+
+    const resolved=await supabaseClient.rpc("resolve_my_notification_nudge",{
+     p_user_id:authUser.user_id,
+     p_enabled:true
+    });
+    if(resolved.error)throw resolved.error;
+
+    authUser.notifications_enabled=true;
+    const p=currentPlayer();
+    if(p){p.notifications=true;p.pushRegistered=true;}
+    persistCurrentAuth();
+
     overlay.remove();
     await syncUsersFromSupabase();
     toast("Notifications enabled and this device is registered.");
     render();
    }catch(e){
-    console.error(e);
-    toast("Could not enable notifications: "+(e.message||"unknown error"));
+    console.error("Mandatory notification enable failed",e);
+    showChoiceError((e&&e.message)||"Could not enable notifications. Tap Try Again, or choose No thanks.");
+    const retryBtn=document.getElementById("nudgeEnableBtn");
+    if(retryBtn)retryBtn.textContent="🔄 Try Again";
+   }finally{
+    setBusy(false);
    }
   };
+
   document.getElementById("nudgeDeclineBtn").onclick=async()=>{
+   setBusy(true);
    try{
-    await unregisterPushSubscription();
+    // Declining is a valid choice. Record OFF and resolve the mandatory prompt.
+    try{await unregisterPushSubscription();}catch(e){console.warn("Push unregister during decline",e);}
+
     const rpcRes=await supabaseClient.rpc("app_set_notifications_by_username",{
      p_username:authUser.username||authUser.name,
      p_enabled:false
     });
     if(rpcRes.error)throw rpcRes.error;
-    await supabaseClient.rpc("resolve_my_notification_nudge",{p_user_id:authUser.user_id,p_enabled:false});
+
+    const resolved=await supabaseClient.rpc("resolve_my_notification_nudge",{
+     p_user_id:authUser.user_id,
+     p_enabled:false
+    });
+    if(resolved.error)throw resolved.error;
+
     authUser.notifications_enabled=false;
-    const p=currentPlayer(); if(p)p.notifications=false;
+    const p=currentPlayer();
+    if(p){p.notifications=false;p.pushRegistered=false;}
     persistCurrentAuth();
+
     overlay.remove();
     await syncUsersFromSupabase();
-    toast("Notifications declined.");
+    toast("Notification preference saved: OFF.");
     render();
    }catch(e){
-    console.error(e);
-    toast("Could not save notification choice: "+(e.message||"unknown error"));
+    console.error("Mandatory notification decline failed",e);
+    showChoiceError((e&&e.message)||"Could not save your choice. Please try again.");
+   }finally{
+    setBusy(false);
    }
   };
  }catch(e){
@@ -3610,18 +3791,19 @@ function currentRoundPickSummary(){
  return rows.map(p=>`<div class="activity-row"><div class="activity-left"><div class="activity-icon">${activityIcon("pick")}</div><div><div class="activity-main">${escapeHtml(p.name||"Player")}</div><div class="activity-sub">${p.pick?`Picked ${escapeHtml(p.pick)}`:"No pick submitted yet"}</div></div></div><div class="activity-time">Round ${state.round}</div></div>`).join("");
 }
 function latestNews(){
- ensureActivityLog();
+ const news=getPlayerNewsActivities();
+ const limit=getPlayerNewsLimit();
  return `<div class="card news-card">
-  <div class="card-head"><strong>Latest News</strong><span class="badge orange">${state.activityLog.length}</span></div>
+  <div class="card-head"><strong>Latest News</strong><span class="badge orange">${news.length}</span></div>
   <div class="card-body">
    <div class="activity-list">
-    ${renderActivityRows(getPlayerNewsLimit())}
+    ${renderActivityRows(limit,news)}
    </div>
    <div class="activity-controls">
-    ${(state.activityLog||[]).length?`<span class="activity-count-note">Showing ${getPlayerNewsLimit()} of ${state.activityLog.length}</span>`:""}
+    ${news.length?`<span class="activity-count-note">Showing ${limit} of ${news.length}</span>`:""}
     <div class="activity-more-actions">
-     ${(state.activityLog||[]).length>getPlayerNewsLimit()?`<button class="small ghost" onclick="showMorePlayerNews()">Show 30 more</button>`:""}
-     ${getPlayerNewsLimit()>PLAYER_NEWS_START?`<button class="small secondary" onclick="showLessPlayerNews()">Show less</button>`:""}
+     ${news.length>limit?`<button class="small ghost" onclick="showMorePlayerNews()">Show 30 more</button>`:""}
+     ${limit>PLAYER_NEWS_START?`<button class="small secondary" onclick="showLessPlayerNews()">Show less</button>`:""}
     </div>
    </div>
   </div>
@@ -4077,7 +4259,7 @@ function playerSettings(){
 
  <div class="card"><div class="card-head"><strong>Install App</strong></div><div class="card-body">
    <button class="install-button" onclick="addAppGuide()">📲 Install SêAH Wind LMS</button>
-   <div id="installHelp" class="notice" style="display:none;margin-top:12px"><strong>Install SêAH Wind LMS:</strong><br>Android/Chrome: tap <strong>Install app</strong> if shown, or open the browser menu ⋮ and choose <strong>Add to Home screen</strong>.<br><br>iPhone/Safari: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.<br><br>Once installed, the app will open more like a normal mobile app.</div>
+   <div id="installHelp" class="notice" style="display:none;margin-top:12px"></div>
  </div></div>`;
 }
 
@@ -4417,15 +4599,56 @@ async function togglePlayerNotifications(){
 }
 
 let deferredInstallPrompt=null;
-window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredInstallPrompt=e;});
-function addAppGuide(){
+let appInstallConfirmed=false;
+window.addEventListener("beforeinstallprompt",(e)=>{
+ e.preventDefault();
+ deferredInstallPrompt=e;
+});
+window.addEventListener("appinstalled",()=>{
+ appInstallConfirmed=true;
+ deferredInstallPrompt=null;
+ toast("SeAH Wind LMS installed.");
+ render();
+});
+function appRunningStandalone(){
+ return window.matchMedia?.("(display-mode: standalone)")?.matches===true ||
+        window.navigator.standalone===true ||
+        appInstallConfirmed===true;
+}
+function installHelpMessage(){
+ if(appRunningStandalone())return "✓ SeAH Wind LMS is already installed on this device.";
+ const ua=navigator.userAgent||"";
+ const isIOS=/iPhone|iPad|iPod/i.test(ua);
+ const isAndroid=/Android/i.test(ua);
+ if(isIOS)return "On iPhone/iPad: open this page in Safari, tap Share, then Add to Home Screen.";
+ if(isAndroid)return "If the install box did not appear, open this page in Chrome, tap the ⋮ menu, then choose Install app or Add to Home screen.";
+ return "If your browser cannot install the app, open this page in Chrome (Android) or Safari (iPhone/iPad) and try again.";
+}
+async function addAppGuide(){
+ if(appRunningStandalone()){
+  toast("The app is already installed on this device.");
+  return;
+ }
  if(deferredInstallPrompt){
-  deferredInstallPrompt.prompt();
-  deferredInstallPrompt.userChoice.then(()=>{deferredInstallPrompt=null;});
+  try{
+   await deferredInstallPrompt.prompt();
+   const choice=await deferredInstallPrompt.userChoice;
+   if(choice?.outcome!=="accepted"){
+    const el=document.getElementById("installHelp");
+    if(el){el.textContent=installHelpMessage();el.style.display="block";}
+   }
+  }catch(e){
+   console.warn("Native install prompt failed",e);
+  }finally{
+   deferredInstallPrompt=null;
+  }
   return;
  }
  const el=document.getElementById("installHelp");
- if(el)el.style.display=el.style.display==="none"?"block":"none";
+ if(el){
+  el.textContent=installHelpMessage();
+  el.style.display=el.style.display==="none"?"block":"none";
+ }
 }
 
 
@@ -6026,8 +6249,8 @@ async function loginUser(){
   await loadChampionRecords();
   const loggedInPlayer=state.players.find(p=>p.id===u.user_id);
   if(loggedInPlayer)loggedInPlayer.notifications=u.notifications_enabled===false?false:true;
-  await ensurePushRegistered(false);
   render();
+  setTimeout(()=>checkNotificationSetupNudge(true),250);
   await loadActivePlayerPoll(true);
  }catch(e){
   console.error("Post-login render/sync failed",e);
@@ -6074,11 +6297,6 @@ async function createAccount(){
  if(!name||!pin)return toast("Enter a username and password.");
  if(pin!==confirmPin)return toast("Passwords do not match.");
 
- // Ask for notification permission while this Create Account click is still active.
- // If permission is granted, the device will be registered to the new account after creation.
- // If the user declines, account creation continues normally.
- await preAskNotificationPermission();
-
  let u=null;
  try{
   const {data,error}=await supabaseClient.rpc("app_register",{p_username:name,p_password:pin,p_join_code:code});
@@ -6115,8 +6333,8 @@ async function createAccount(){
   };
   currentUserId=u.user_id;
 
-  // New accounts start with notifications enabled in the app database.
-  // Device/browser permission is handled separately by the native prompt.
+  // Preserve the account as created. The player will make an explicit
+  // Keep me updated / No thanks choice immediately after the dashboard loads.
   storeAuthUser(authUser,remember);
   saveRememberedUsername(u.username||name,remember);
 
@@ -6127,8 +6345,6 @@ async function createAccount(){
    });
    if(contactRes.error)throw contactRes.error;
   }
-
-  await forceEnableNotificationsForLoggedInUser();
 
   await loadAppSettingsFromSupabase();
   await loadAnnouncementDismissalsForUser();
@@ -6170,6 +6386,7 @@ async function createAccount(){
   localStorage.setItem(storeKey,JSON.stringify(state));
   await ensurePushRegistered(false);
   render();
+  if(u.role!=="admin")setTimeout(()=>checkNotificationSetupNudge(false),250);
   await loadActivePlayerPoll(true);
  }catch(e){
   console.error("Post-create render/sync failed",e);
@@ -6246,9 +6463,11 @@ async function loadAppSettingsFromSupabase(){
 
   ensureLeagues();
   localStorage.setItem(storeKey,JSON.stringify(state));
+  setOnlineStatus(true,"Database connected");
   return true;
  }catch(e){
   console.warn("Could not load app settings",e);
+  setOnlineStatus(false,"Connection problem — retrying");
   toast("Could not load database settings: "+(e.message||"unknown error"));
   return false;
  }
@@ -6257,37 +6476,33 @@ async function loadAppSettingsFromSupabase(){
 async function boot(){
  if(authUser)currentUserId=authUser.user_id||null;
 
- // The Supabase client is available even before a login. Previous builds never set
- // onlineReady=true, so Settings buttons and Factory Reset silently saved only locally.
- setOnlineStatus(true,"Database connected");
+ setOnlineStatus(false,"Connecting…");
+
+ // Load shared settings first. If a player/admin already has a saved login,
+ // load their Supabase-backed state before drawing the dashboard.
  await loadAppSettingsFromSupabase();
  await loadAnnouncementDismissalsForUser();
+
+ if(authUser){
+  try{await syncUsersFromSupabase();}catch(e){console.warn("Initial user sync skipped",e);}
+  try{await loadChampionRecords();}catch(e){console.warn("Initial Hall of Fame load skipped",e);}
+ }
+
  render();
- await syncUsersFromSupabase();
- await loadChampionRecords();
- await loadTeamStatistics(false);
- await loadBuyBackData(false);
+
+ try{await loadTeamStatistics(false);}catch(e){console.warn("Initial statistics load skipped",e);}
+ try{await loadBuyBackData(false);}catch(e){console.warn("Initial buy-back load skipped",e);}
  if(authUser&&authUser.role==="admin")startAdminBuyBackWatch();
- await loadAdminPollData(false);
- await ensurePushRegistered(true);
+ try{await loadAdminPollData(false);}catch(e){console.warn("Initial poll load skipped",e);}
+ try{await ensurePushRegistered(true);}catch(e){console.warn("Initial push registration check skipped",e);}
  render();
- await loadActivePlayerPoll(true);
+
+ if(authUser&&authUser.role!=="admin")setTimeout(()=>checkNotificationSetupNudge(false),300);
+ try{await loadActivePlayerPoll(true);}catch(e){console.warn("Initial active poll load skipped",e);}
 }
 
-
-
-if("serviceWorker" in navigator){
- window.addEventListener("load",async()=>{
-  // Do not unregister the service worker on every load. Push notifications depend on it.
-  // We only clear browser caches so GitHub Pages can serve the latest app shell.
-  try{
-   if(window.caches){
-    const keys=await caches.keys();
-    for(const key of keys){await caches.delete(key);}
-   }
-  }catch(e){console.warn("Cache clear failed",e);}
- });
-}
+// v114: do NOT delete browser/PWA caches on every load.
+// App updates must not wipe saved login/session storage or deliberately purge caches.
 
 window.rules=rules;
 window.settings=settings;
@@ -6324,24 +6539,34 @@ window.notifyUnpaid=notifyUnpaid;
 window.notifyMissingPicks=notifyMissingPicks;
 window.notifyWinner=notifyWinner;
 window.notifyRollover=notifyRollover;
+window.openForgotUsername=openForgotUsername;
+window.closeForgotUsername=closeForgotUsername;
+window.filterForgotUsernameList=filterForgotUsernameList;
 
+let sharedRefreshBusy=false;
 async function refreshSharedState(){
- if(!authUser)return;
- const old=JSON.stringify({
-  competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
-  entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
-  rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
- });
- await loadAppSettingsFromSupabase();
- await loadAnnouncementDismissalsForUser();
- await syncUsersFromSupabase();
- await loadChampionRecords();
- const next=JSON.stringify({
-  competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
-  entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
-  rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
- });
- if(old!==next)render();
+ if(!authUser||sharedRefreshBusy)return;
+ sharedRefreshBusy=true;
+ try{
+  const old=JSON.stringify({
+   competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
+   entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
+   rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
+  });
+  await loadAppSettingsFromSupabase();
+  await loadAnnouncementDismissalsForUser();
+  await syncUsersFromSupabase();
+  await loadChampionRecords();
+  const next=JSON.stringify({
+   competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
+   entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
+   rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
+  });
+  if(old!==next)render();
+  if(authUser&&authUser.role!=="admin")await checkNotificationSetupNudge(false);
+ }finally{
+  sharedRefreshBusy=false;
+ }
 }
 setInterval(()=>{
  refreshSharedState().catch(e=>console.warn("Auto refresh skipped",e));
