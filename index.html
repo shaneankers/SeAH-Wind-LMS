@@ -1588,6 +1588,15 @@ body.player-mode .badge.orange{
  .random-draw-history-row>.tiny{margin-top:5px}
 }
 
+
+/* v118 Admin Tools / rollover preview */
+.rollover-ranking-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.rollover-rank-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:center}
+.rollover-rank-number{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:1000;background:#0f2747;color:white}
+.rollover-preview-list{display:flex;flex-direction:column;gap:8px}
+.rollover-preview-row{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
+@media(max-width:700px){.rollover-ranking-grid{grid-template-columns:1fr}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -2480,7 +2489,7 @@ function switchAdminView(view){
  page=view==="admin"?"dashboard":"myPick";
  render();
 }
-function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","⚽ Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["tools","🎛️ Tools"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","⚽ Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
 function render(){
  chooseHeaderPhoto(false);
  document.body.classList.toggle("player-mode",role==="player");
@@ -2510,7 +2519,7 @@ function render(){
  document.getElementById("sideSub").textContent="";
  document.querySelector(".sidebar").classList.toggle("player-mode",role==="player");
  document.querySelector(".sidebar").classList.toggle("admin-mode",role==="admin");
- const views={dashboard:dashboard,players:players,round:round,liveFootball:liveFootball,statistics:statistics,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
+ const views={dashboard:dashboard,players:players,round:round,tools:adminTools,liveFootball:liveFootball,statistics:statistics,settings:settings,myPick:myPick,latestNews:latestNews,previous:previous,competition:competition,playerHall:playerHall,rules:rules,playerSettings:playerSettings};
  const view=views[page]||dashboard;
  const content=document.getElementById("content");
  try{
@@ -2530,6 +2539,8 @@ function setPage(p){
   Promise.resolve().then(()=>loadBuyBackData(false)).then(()=>syncUsersFromSupabase()).then(()=>render()).catch(e=>console.warn("Buy-back page refresh failed",e));
  }else if(p==="settings"&&authUser&&authUser.role==="admin"){
   loadAdminPollData(true);
+ }else if(p==="tools"&&authUser&&authUser.role==="admin"){
+  loadRandomDrawHistory(true);
  }else if(p==="liveFootball"){
   loadLiveFootballAll(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
@@ -3411,31 +3422,102 @@ async function spinRandomTeamWheel(){
  }
 }
 
-function round(){
- const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
- const randomCandidates=roundPlayers.filter(p=>p&&p.id&&p.result!=="processed_win");
+
+let rolloverRankingDraft=[];
+
+function rolloverRankingLength(){
+ return Math.max(1,Number(state.round||1));
+}
+function ensureRolloverRankingDraft(){
+ const n=rolloverRankingLength();
+ rolloverRankingDraft=Array.isArray(rolloverRankingDraft)?rolloverRankingDraft.slice(0,n):[];
+ while(rolloverRankingDraft.length<n)rolloverRankingDraft.push("");
+}
+function setRolloverRank(index,value){
+ ensureRolloverRankingDraft();
+ const team=String(value||"");
+ if(team&&rolloverRankingDraft.some((x,i)=>i!==index&&x===team)){
+  toast("Each team can only appear once in the rollover ranking.");
+  render();
+  return;
+ }
+ rolloverRankingDraft[index]=team;
+ render();
+}
+function rolloverPreviewForPlayer(p){
+ ensureRolloverRankingDraft();
+ const genuine=(Array.isArray(p.previous)?p.previous:[]).map(x=>String(x||"").trim()).filter(Boolean);
+ // Include current pick if it has not yet been rolled into previous.
+ if(p.pick&&!genuine.includes(p.pick))genuine.push(String(p.pick));
+ const required=Math.max(0,rolloverRankingLength()-genuine.length);
+ const used=new Set(genuine);
+ const bans=[];
+ for(const team of rolloverRankingDraft){
+  if(bans.length>=required)break;
+  if(team&&!used.has(team)){
+   bans.push(team);
+   used.add(team);
+  }
+ }
+ return {genuine,required,bans};
+}
+function renderRolloverPreview(){
+ ensureRolloverRankingDraft();
+ const complete=rolloverRankingDraft.every(Boolean);
+ if(!complete)return `<div class="notice">Complete all ${rolloverRankingLength()} ranking positions to preview the rollover restrictions.</div>`;
+ const candidates=state.players.filter(p=>p&&p.role!=="admin");
+ return `<div class="rollover-preview-list">${candidates.map(p=>{
+  const x=rolloverPreviewForPlayer(p);
+  return `<div class="rollover-preview-row">
+   <div><strong>${displayNameHtml(p)}</strong><div class="tiny">${x.genuine.length} genuine team${x.genuine.length===1?"":"s"} used · ${x.required} additional rollover ban${x.required===1?"":"s"}</div></div>
+   <div class="tiny"><strong>Would ban:</strong> ${x.bans.length?x.bans.map(escapeHtml).join(", "):"No additional teams"}</div>
+  </div>`;
+ }).join("")}</div>`;
+}
+function toggleRolloverPreview(){
+ const el=document.getElementById("rolloverRestrictionPreview");
+ if(!el)return;
+ el.style.display=el.style.display==="none"?"block":"none";
+ if(el.style.display==="block")el.innerHTML=renderRolloverPreview();
+}
+function adminTools(){
+ ensureRolloverRankingDraft();
+ const n=rolloverRankingLength();
+ const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round"&&p&&p.id&&p.result!=="processed_win");
  return `<div class="card random-draw-card">
-   <div class="card-head"><strong>🎡 Random Team Draw</strong><span class="badge dark">Recorded draw</span></div>
-   <div class="card-body">
-    <div class="random-draw-layout">
-     <div class="random-wheel-wrap">
-      <div id="randomTeamWheel" class="random-team-wheel"><div class="random-wheel-center">SPIN</div></div>
-     </div>
-     <div class="random-draw-controls">
-      <label>Player requiring a random team</label>
-      <select id="randomDrawPlayer" onchange="updateRandomDrawPoolPreview()">
-       <option value="">Choose player…</option>
-       ${randomCandidates.map(p=>`<option value="${escapeAttr(p.id)}">${displayNameHtml(p)}${p.pick?` — current: ${escapeHtml(p.pick)}`:""}</option>`).join("")}
-      </select>
-      <div id="randomDrawPoolInfo" class="tiny" style="margin-top:7px">Choose a player to see their eligible team pool.</div>
-      <button id="randomDrawSpinButton" class="yellow" style="margin-top:12px" onclick="spinRandomTeamWheel()" ${randomDrawBusy?"disabled":""}>${randomDrawBusy?"Spinning…":"🎡 Spin & Assign"}</button>
-      <div id="randomDrawResult" style="margin-top:12px"><div class="tiny">The server chooses the result, saves it to the player's pick and records the draw before it appears in Latest News.</div></div>
-     </div>
+  <div class="card-head"><strong>🎡 Random Team Draw</strong><span class="badge dark">Recorded draw</span></div>
+  <div class="card-body">
+   <div class="random-draw-layout">
+    <div class="random-wheel-wrap"><div id="randomTeamWheel" class="random-team-wheel"><div class="random-wheel-center">SPIN</div></div></div>
+    <div class="random-draw-controls">
+     <label>Player requiring a random team</label>
+     <select id="randomDrawPlayer" onchange="updateRandomDrawPoolPreview()"><option value="">Choose player…</option>${roundPlayers.map(p=>`<option value="${escapeAttr(p.id)}">${displayNameHtml(p)}${p.pick?` — current: ${escapeHtml(p.pick)}`:""}</option>`).join("")}</select>
+     <div id="randomDrawPoolInfo" class="tiny" style="margin-top:7px">Choose a player to see their eligible team pool.</div>
+     <button id="randomDrawSpinButton" class="yellow" style="margin-top:12px" onclick="spinRandomTeamWheel()" ${randomDrawBusy?"disabled":""}>${randomDrawBusy?"Spinning…":"🎡 Spin & Assign"}</button>
+     <div id="randomDrawResult" style="margin-top:12px"><div class="tiny">The server chooses and records the result before it is published.</div></div>
     </div>
-    <details style="margin-top:16px"><summary style="cursor:pointer;font-weight:900;color:#334155">Random Draw History</summary><div style="margin-top:10px">${renderRandomDrawHistory()}</div></details>
    </div>
+   <details style="margin-top:16px"><summary style="cursor:pointer;font-weight:900;color:#334155">Random Draw History</summary><div style="margin-top:10px">${renderRandomDrawHistory()}</div></details>
+  </div>
  </div>
 
+ <div class="card">
+  <div class="card-head"><strong>📊 Rollover Team Ranking</strong><span class="badge yellow">Preview · Round ${n}</span></div>
+  <div class="card-body">
+   <div class="notice" style="margin-bottom:14px">This is a <strong>preview/setup tool only</strong> during the current competition. It does not change any player's teams or Supabase data. If a rollover were started after Round ${n}, every returning player would have ${n} unavailable teams in total: genuine picks first, then extra bans taken from this ranking in order.</div>
+   <div class="rollover-ranking-grid">
+    ${rolloverRankingDraft.map((chosen,i)=>`<div class="rollover-rank-row"><div class="rollover-rank-number">${i+1}</div><select onchange="setRolloverRank(${i},this.value)"><option value="">Choose team…</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${chosen===t?"selected":""} ${rolloverRankingDraft.some((x,j)=>j!==i&&x===t)?"disabled":""}>${escapeHtml(t)}</option>`).join("")}</select></div>`).join("")}
+   </div>
+   <button class="secondary" style="margin-top:14px" onclick="toggleRolloverPreview()">Preview Restrictions</button>
+   <div id="rolloverRestrictionPreview" style="display:none;margin-top:14px"></div>
+   <div class="tiny" style="margin-top:12px">When we connect this to a real rollover, the completed ranking will be frozen at rollover start. For now this section lets you verify the ranking and calculations safely.</div>
+  </div>
+ </div>`;
+}
+
+function round(){
+ const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
+ return `
  <div class="card">
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
@@ -6757,6 +6839,8 @@ window.notifyMissingPicks=notifyMissingPicks;
 window.notifyWinner=notifyWinner;
 window.notifyRollover=notifyRollover;
 window.spinRandomTeamWheel=spinRandomTeamWheel;
+window.setRolloverRank=setRolloverRank;
+window.toggleRolloverPreview=toggleRolloverPreview;
 window.updateRandomDrawPoolPreview=updateRandomDrawPoolPreview;
 window.openForgotUsername=openForgotUsername;
 window.closeForgotUsername=closeForgotUsername;
