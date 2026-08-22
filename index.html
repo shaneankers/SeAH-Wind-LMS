@@ -1745,9 +1745,34 @@ body.player-mode .badge.orange{
  }
 }
 
+
+/* v125 compact locked-pick spacing */
+#playerArea .card-body:has(.team-restrictions-wrap) {
+ padding-bottom:18px!important;
+}
+#playerArea .team-restrictions-wrap + .notice,
+#playerArea .team-restrictions-wrap ~ .notice {
+ margin-top:14px!important;
+ margin-bottom:12px!important;
+}
+#playerArea .team-restrictions-wrap ~ .actions {
+ margin-top:12px!important;
+}
+
+
+/* v125 exact My Pick vertical spacing */
+.locked-pick-notice{
+ margin-top:14px!important;
+ margin-bottom:12px!important;
+}
+.pick-confirm-button{
+ margin-top:0!important;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- v123: approved rollover entrants stay paid/alive after sync -->
+<!-- v125 compact locked-pick spacing -->
 <!-- v124 complete rollover system + compact restrictions UI -->
 </head>
 <body>
@@ -4456,8 +4481,8 @@ function myPick(){
     </div>
    </div>
   </div>`:""}
-  ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
-  <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
+  ${p.locked?`<div class="notice locked-pick-notice">Your pick is locked for this round.</div>`:""}
+  <button class="install-button pick-confirm-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
  </div></div>`;
 }
 function toggleTeamRestrictionsPanel(){
