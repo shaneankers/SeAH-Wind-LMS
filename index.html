@@ -1560,6 +1560,34 @@ body.player-mode .badge.orange{
   }
 }
 
+
+/* v117 Admin Random Team Draw */
+.random-draw-layout{display:grid;grid-template-columns:210px 1fr;gap:22px;align-items:center}
+.random-wheel-wrap{display:flex;align-items:center;justify-content:center}
+.random-team-wheel{
+ width:190px;height:190px;border-radius:50%;
+ background:conic-gradient(#f97316 0 12.5%,#0f2747 12.5% 25%,#f59e0b 25% 37.5%,#16324f 37.5% 50%,#fb923c 50% 62.5%,#102f55 62.5% 75%,#fdba74 75% 87.5%,#071a31 87.5% 100%);
+ border:7px solid #fff;outline:3px solid #e2e8f0;box-shadow:0 16px 35px rgba(2,8,23,.2);
+ display:flex;align-items:center;justify-content:center;position:relative;
+}
+.random-team-wheel::before{content:"▼";position:absolute;top:-23px;color:#f97316;font-size:25px;z-index:2}
+.random-wheel-center{
+ width:72px;height:72px;border-radius:50%;background:white;border:4px solid #071a31;
+ display:flex;align-items:center;justify-content:center;font-weight:1000;color:#071a31;
+ box-shadow:0 8px 22px rgba(0,0,0,.22)
+}
+.random-team-wheel.spinning{animation:seah-wheel-spin 2.2s cubic-bezier(.12,.65,.16,1) forwards}
+@keyframes seah-wheel-spin{from{transform:rotate(0deg)}to{transform:rotate(2520deg)}}
+.random-draw-winner{font-size:25px;font-weight:1000;color:#f97316}
+.random-draw-history{display:flex;flex-direction:column;gap:7px}
+.random-draw-history-row{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
+@media(max-width:700px){
+ .random-draw-layout{grid-template-columns:1fr}
+ .random-team-wheel{width:165px;height:165px}
+ .random-draw-history-row{display:block}
+ .random-draw-history-row>.tiny{margin-top:5px}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -2242,7 +2270,7 @@ function renderAuth(){
  }
  app.style.display="none";login.style.display="block";
  const remembered=rememberedUsername();
- login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div class="tiny" style="margin-top:6px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="openForgotUsername()">Forgot your username? View current player accounts</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
+ login.innerHTML=`<div class="login-wrap"><div class="login-hero"><div class="big-logo"><div class="logo-main">SeAH</div><div class="logo-sub">Wind LMS</div></div><h1 style="margin:0">SeAH Wind LMS</h1><div class="sub" style="color:#431407">Last Man Standing</div></div><div class="login-body"><div class="login-tabs"><button class="${loginMode==='login'?'active':''}" onclick="loginMode='login';renderAuth()">Login</button><button class="${loginMode==='create'?'active':''}" onclick="loginMode='create';renderAuth()">Create Account</button></div>${state.disclaimer?`<div class="notice" style="margin-bottom:14px;font-size:12px">${textToHtml(state.disclaimer)}</div>`:""}${loginMode==='login'?`<label>Username</label><input id="loginName" value="${escapeAttr(remembered)}" autocomplete="username" placeholder="Enter username"><div style="margin-top:2px;text-align:left"><button type="button" onclick="openForgotUsername()" style="background:none;border:0;padding:2px 0;font-size:11px;font-weight:700;color:#64748b;box-shadow:none;min-height:0;width:auto">Forgot your username?</button></div><div class="tiny" style="margin-top:4px">Use the identifiable username you registered with.</div><label style="margin-top:12px">Password</label><input id="loginPin" type="password" autocomplete="current-password" placeholder="Enter password"><label class="remember-row"><input id="rememberMe" type="checkbox" ${remembered?"checked":""}> Remember me on this device</label><button class="install-button" onclick="loginUser()">Login</button><button class="auth-link" onclick="loginMode='create';renderAuth()">Don't have an account? Create Account</button>`:`<label>Username</label><input id="createName" autocomplete="username" placeholder="Choose username"><div class="tiny" style="margin-top:6px">Please choose a name that is easily identifiable to the administrator should you win the prize money. Example: Your full name.</div><label style="margin-top:12px">Contact Number <span class="muted">(optional)</span></label><input id="createContactNumber" inputmode="tel" autocomplete="tel" placeholder="Example: 07..."><div class="tiny" style="margin-top:6px">Strongly advised so the administrator can contact you about prize money or account issues. Only the administrator can see it.</div><label style="margin-top:12px">Password</label><input id="createPin" type="password" autocomplete="new-password" placeholder="Create password"><label style="margin-top:12px">Confirm Password</label><input id="createPinConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"><label style="margin-top:12px">Join Code</label><input id="joinCode" placeholder="Enter join code"><label class="remember-row"><input id="createRemember" type="checkbox" checked> Remember me on this device</label><button class="install-button" onclick="createAccount()">Create Account</button><button class="auth-link" onclick="loginMode='login';renderAuth()">Already have an account? Login</button>`}</div></div>`;
  return false
 }
 
@@ -3266,15 +3294,155 @@ function players(){
    </div>
  </div>`;
 }
+
+let randomDrawBusy=false;
+let randomDrawHistory=[];
+
+function randomDrawEligibleTeams(player){
+ if(!player)return [];
+ const used=new Set((Array.isArray(player.previous)?player.previous:[]).map(x=>String(x||"").trim()).filter(Boolean));
+ return (state.teams||[]).map(x=>String(x||"").trim()).filter(Boolean).filter(team=>!used.has(team));
+}
+
+async function loadRandomDrawHistory(forceRender=false){
+ try{
+  if(!supabaseClient)return;
+  const {data,error}=await supabaseClient.rpc("get_random_team_draw_history",{p_limit:50});
+  if(error){
+   const msg=String(error.message||"").toLowerCase();
+   if(msg.includes("get_random_team_draw_history")||msg.includes("could not find the function"))return;
+   throw error;
+  }
+  randomDrawHistory=Array.isArray(data)?data:[];
+  if(forceRender)render();
+ }catch(e){
+  console.warn("Could not load random draw history",e);
+ }
+}
+
+function renderRandomDrawHistory(){
+ if(!randomDrawHistory.length)return `<div class="notice">No random team draws have been recorded yet.</div>`;
+ return `<div class="random-draw-history">${randomDrawHistory.map(d=>{
+  const when=d.drawn_at?new Date(d.drawn_at).toLocaleString():"";
+  return `<div class="random-draw-history-row">
+   <div><strong>🎡 ${escapeHtml(d.display_name||"Player")} → ${escapeHtml(d.selected_team||"")}</strong>
+   <div class="tiny">Competition ${Number(d.competition_number||1)} · Round ${Number(d.round_number||1)}${Number(d.rollover_number||0)?` · Rollover ${Number(d.rollover_number)}`:""} · ${Number(d.eligible_count||0)} eligible teams</div></div>
+   <div class="tiny">${escapeHtml(when)}</div>
+  </div>`;
+ }).join("")}</div>`;
+}
+
+function updateRandomDrawPoolPreview(){
+ const select=document.getElementById("randomDrawPlayer");
+ const info=document.getElementById("randomDrawPoolInfo");
+ if(!select||!info)return;
+ const p=state.players.find(x=>String(x.id)===String(select.value));
+ if(!p){info.textContent="Choose a player to see their eligible team pool.";return;}
+ const teams=randomDrawEligibleTeams(p);
+ info.textContent=`${teams.length} eligible team${teams.length===1?"":"s"} on the wheel. Previously used teams are excluded.`;
+}
+
+async function spinRandomTeamWheel(){
+ if(randomDrawBusy)return toast("The wheel is already spinning.");
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+
+ const playerId=String(document.getElementById("randomDrawPlayer")?.value||"");
+ const p=state.players.find(x=>String(x.id)===playerId);
+ if(!p)return toast("Choose a player first.");
+ if(p.result==="processed_win")return toast("That player's current result has already been processed.");
+ if(p.pick&&!confirm(`${p.name} already has ${p.pick}. Replace it with a recorded random draw?`))return;
+
+ const eligible=randomDrawEligibleTeams(p);
+ if(!eligible.length)return toast("There are no eligible teams available for this player.");
+
+ randomDrawBusy=true;
+ const wheel=document.getElementById("randomTeamWheel");
+ const resultEl=document.getElementById("randomDrawResult");
+ const spinBtn=document.getElementById("randomDrawSpinButton");
+ if(spinBtn)spinBtn.disabled=true;
+ if(resultEl)resultEl.innerHTML=`<strong>Spinning…</strong><div class="tiny">The result will be recorded in Supabase.</div>`;
+
+ try{
+  // Server chooses and records the team atomically. The animation is display only.
+  const {data,error}=await supabaseClient.rpc("admin_spin_random_team_atomic",{
+   p_admin_user_id:authUser.user_id,
+   p_player_user_id:p.id,
+   p_eligible_teams:eligible,
+   p_competition_number:Number(state.competition||1),
+   p_rollover_number:Number(state.rollover||0),
+   p_round_number:Number(state.round||1)
+  });
+  if(error)throw error;
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||row.success!==true)throw new Error(row?.message||"Random draw was not saved.");
+
+  if(wheel){
+   wheel.classList.remove("spinning");
+   void wheel.offsetWidth;
+   wheel.classList.add("spinning");
+  }
+  await new Promise(resolve=>setTimeout(resolve,2300));
+
+  const selected=String(row.selected_team||"");
+  p.pick=selected;
+  p.locked=true;
+
+  addActivity(
+   "pick",
+   `🎡 Random draw: ${selected} assigned to ${p.name}`,
+   `Round ${state.round} · ${Number(row.eligible_count||eligible.length)} eligible teams · draw recorded`
+  );
+  try{await dbSaveActivityLog();}catch(e){console.warn("Random draw news save failed",e);}
+
+  await syncUsersFromSupabase();
+  await loadRandomDrawHistory(false);
+  localStorage.setItem(storeKey,JSON.stringify(state));
+
+  if(resultEl)resultEl.innerHTML=`<div class="random-draw-winner">🎡 ${escapeHtml(selected)}</div><div class="tiny">Assigned to ${escapeHtml(p.name)} and permanently recorded.</div>`;
+  toast(`${selected} randomly assigned to ${p.name}.`);
+  render();
+ }catch(e){
+  console.error("Random team draw failed",e);
+  if(resultEl)resultEl.innerHTML=`<div class="notice">Draw failed: ${escapeHtml(e.message||"please try again")}</div>`;
+  toast("Random draw was NOT recorded.");
+ }finally{
+  randomDrawBusy=false;
+  if(spinBtn)spinBtn.disabled=false;
+ }
+}
+
 function round(){
  const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
- return `<div class="card">
+ const randomCandidates=roundPlayers.filter(p=>p&&p.id&&p.result!=="processed_win");
+ return `<div class="card random-draw-card">
+   <div class="card-head"><strong>🎡 Random Team Draw</strong><span class="badge dark">Recorded draw</span></div>
+   <div class="card-body">
+    <div class="random-draw-layout">
+     <div class="random-wheel-wrap">
+      <div id="randomTeamWheel" class="random-team-wheel"><div class="random-wheel-center">SPIN</div></div>
+     </div>
+     <div class="random-draw-controls">
+      <label>Player requiring a random team</label>
+      <select id="randomDrawPlayer" onchange="updateRandomDrawPoolPreview()">
+       <option value="">Choose player…</option>
+       ${randomCandidates.map(p=>`<option value="${escapeAttr(p.id)}">${displayNameHtml(p)}${p.pick?` — current: ${escapeHtml(p.pick)}`:""}</option>`).join("")}
+      </select>
+      <div id="randomDrawPoolInfo" class="tiny" style="margin-top:7px">Choose a player to see their eligible team pool.</div>
+      <button id="randomDrawSpinButton" class="yellow" style="margin-top:12px" onclick="spinRandomTeamWheel()" ${randomDrawBusy?"disabled":""}>${randomDrawBusy?"Spinning…":"🎡 Spin & Assign"}</button>
+      <div id="randomDrawResult" style="margin-top:12px"><div class="tiny">The server chooses the result, saves it to the player's pick and records the draw before it appears in Latest News.</div></div>
+     </div>
+    </div>
+    <details style="margin-top:16px"><summary style="cursor:pointer;font-weight:900;color:#334155">Random Draw History</summary><div style="margin-top:10px">${renderRandomDrawHistory()}</div></details>
+   </div>
+ </div>
+
+ <div class="card">
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
      ${roundPlayers.map(p=>{const i=state.players.indexOf(p);const processed=p.result==="processed_win";return `<div class="round-compact-row final-correct">
        <div class="round-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="round-controls-8020">
-         <div><label>Team</label><select onchange="setPick(${i},this.value)" ${processed?'disabled':''}><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
+         <div><label>Team</label><select onchange="setPick(${i},this.value)" ${processed||adminPickSaveBusy.has(p.id)?'disabled':''}><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
          <div><label>Result</label>${processed?`<div class="processed-result">🟩 Processed</div>`:`<select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select>`}</div>
        </div>
      </div>`}).join("")||`<div class="notice">No active Round ${state.round} picks.</div>`}
@@ -3307,7 +3475,6 @@ function round(){
    ${winnerReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>1 player remains.</strong> Press Confirm Winner once to add them to the Hall of Fame and complete this competition.</div>`:rolloverReady?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>No players remain.</strong> Press Start Rollover to begin the rollover and reset eligible players for payment.</div>`:championConfirmed?`<div class="tiny" style="margin-top:8px;text-align:center;color:#64748b"><strong>Winner confirmed.</strong> This competition is complete.</div>`:""}`;
   })()}`;
 }
-
 
 
 function normalisePollOptions(value){
@@ -5180,7 +5347,56 @@ async function resetPlayerPassword(i){
  }
 }
 
-async function setPick(i,v){const p=state.players[i];const old=p.pick;p.pick=v;if(v&&v!==old)addActivity("pick",p.name+" picked "+v,"Admin updated Round "+state.round+" pick");await saveNow()}
+let adminPickSaveBusy=new Set();
+async function setPick(i,v){
+ const p=state.players[i];
+ if(!p||!p.id)return toast("Player not found.");
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ if(adminPickSaveBusy.has(p.id))return toast("That player's team is already being saved.");
+
+ const old=String(p.pick||"");
+ const next=String(v||"");
+ if(next===old)return;
+
+ adminPickSaveBusy.add(p.id);
+ p.pick=next;
+ render();
+
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_assign_player_pick_atomic",{
+   p_admin_user_id:authUser.user_id,
+   p_player_user_id:p.id,
+   p_team:next||null
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result||result.success!==true)throw new Error(result?.message||"Team assignment was not saved.");
+
+  // Only announce AFTER Supabase confirms the exact player's pick.
+  p.pick=result.pick||"";
+  p.locked=!!p.pick;
+  if(next){
+   addActivity("pick",`Admin assigned ${next} to ${p.name}`,`Round ${state.round} team assigned by admin`);
+   try{await dbSaveActivityLog();}catch(e){console.warn("Admin assignment news save failed",e);}
+   toast(`${next} assigned to ${p.name}.`);
+  }else{
+   addActivity("admin",`Admin cleared ${p.name}'s pick`,`Round ${state.round}`);
+   try{await dbSaveActivityLog();}catch(e){console.warn("Admin clear-pick activity save failed",e);}
+   toast(`${p.name}'s pick cleared.`);
+  }
+
+  await syncUsersFromSupabase();
+  localStorage.setItem(storeKey,JSON.stringify(state));
+  render();
+ }catch(e){
+  console.error("Admin team assignment failed",e);
+  p.pick=old;
+  render();
+  toast(`${next||"That change"} was NOT saved for ${p.name}: ${e.message||"please try again"}`);
+ }finally{
+  adminPickSaveBusy.delete(p.id);
+ }
+}
 let teamResultBusy=false;
 async function setResult(i,v){
  const source=state.players[i];
@@ -6494,6 +6710,7 @@ async function boot(){
  try{await loadBuyBackData(false);}catch(e){console.warn("Initial buy-back load skipped",e);}
  if(authUser&&authUser.role==="admin")startAdminBuyBackWatch();
  try{await loadAdminPollData(false);}catch(e){console.warn("Initial poll load skipped",e);}
+ if(authUser)try{await loadRandomDrawHistory(false);}catch(e){console.warn("Initial random draw history load skipped",e);}
  try{await ensurePushRegistered(true);}catch(e){console.warn("Initial push registration check skipped",e);}
  render();
 
@@ -6539,6 +6756,8 @@ window.notifyUnpaid=notifyUnpaid;
 window.notifyMissingPicks=notifyMissingPicks;
 window.notifyWinner=notifyWinner;
 window.notifyRollover=notifyRollover;
+window.spinRandomTeamWheel=spinRandomTeamWheel;
+window.updateRandomDrawPoolPreview=updateRandomDrawPoolPreview;
 window.openForgotUsername=openForgotUsername;
 window.closeForgotUsername=closeForgotUsername;
 window.filterForgotUsernameList=filterForgotUsernameList;
@@ -6557,6 +6776,7 @@ async function refreshSharedState(){
   await loadAnnouncementDismissalsForUser();
   await syncUsersFromSupabase();
   await loadChampionRecords();
+  await loadRandomDrawHistory(false);
   const next=JSON.stringify({
    competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
    entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
