@@ -1597,6 +1597,7 @@ body.player-mode .badge.orange{
 .rollover-preview-row{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
 @media(max-width:700px){.rollover-ranking-grid{grid-template-columns:1fr}}
 
+.rollover-frozen-team{min-height:42px;display:flex;align-items:center;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;font-weight:900;color:#0f2747}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1827,7 +1828,7 @@ function sortTextList(list){return [...new Set((list||[]).map(x=>String(x||"").t
 function paid(){return state.players.filter(p=>p.paid&&p.approved&&!isQueuedForNextCompetition(p))}
 function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive&&!isQueuedForNextCompetition(p))}
 function out(){return state.players.filter(p=>p.paid&&p.approved&&!p.alive&&!isQueuedForNextCompetition(p)).sort((a,b)=>(b.outRound||0)-(a.outRound||0))}
-function pot(){return (state.potCarryover||0)+(state.manualPotAdjustment||0)+(paid().length*state.entryFee)}
+function pot(){return (state.potCarryover||0)+(state.manualPotAdjustment||0)+(paid().length*state.entryFee)+(rolloverExtraContribution||0)}
 function currentPlayer(){
  if(authUser&&authUser.user_id){
   const byId=state.players.find(p=>p.id===authUser.user_id);
@@ -2540,7 +2541,7 @@ function setPage(p){
  }else if(p==="settings"&&authUser&&authUser.role==="admin"){
   loadAdminPollData(true);
  }else if(p==="tools"&&authUser&&authUser.role==="admin"){
-  loadRandomDrawHistory(true);
+  Promise.all([loadRandomDrawHistory(false),loadRolloverData(false)]).then(()=>render()).catch(e=>console.warn("Tools refresh failed",e));
  }else if(p==="liveFootball"){
   loadLiveFootballAll(true);
  }else if(p==="latestNews"||p==="competition"||p==="previous"){
@@ -3041,6 +3042,7 @@ function dashboard(){
  const alerts=(state.adminAlerts||[]).map((a,i)=>`<div class="admin-alert"><strong>${escapeHtml(a.title||"Alert")}</strong><div>${escapeHtml(a.message||"")}</div><div class="actions" style="margin-top:10px"><button class="small" onclick="dismissAdminAlert(${i})">Dismiss</button></div></div>`).join("");
  return `${alerts}
  ${adminBuyBackPanel()}
+ ${renderAdminRolloverJoinRequests()}
  <div class="admin-hero">
   <div class="admin-hero-cell">
    <div class="icon-wrap navy">${appIcon('trophy')}</div>
@@ -3312,6 +3314,7 @@ let randomDrawHistory=[];
 function randomDrawEligibleTeams(player){
  if(!player)return [];
  const used=new Set((Array.isArray(player.previous)?player.previous:[]).map(x=>String(x||"").trim()).filter(Boolean));
+ playerRolloverBans(player).forEach(t=>used.add(String(t||"").trim()));
  return (state.teams||[]).map(x=>String(x||"").trim()).filter(Boolean).filter(team=>!used.has(team));
 }
 
@@ -3424,6 +3427,210 @@ async function spinRandomTeamWheel(){
 
 
 let rolloverRankingDraft=[];
+let rolloverFrozenRanking=[];
+let rolloverBansByUser=new Map();
+let rolloverJoinRequests=[];
+let currentRolloverJoinRequest=null;
+let rolloverExtraContribution=0;
+let rolloverDataLoading=false;
+
+
+function playerRolloverBans(p){
+ if(!p||!p.id)return [];
+ return rolloverBansByUser.get(String(p.id))||[];
+}
+function playerParticipatedBeforeRollover(p){
+ if(!p||p.adminPlayer)return false;
+ // A paid player genuinely entered. History/picks also count for safety.
+ return !!(
+  p.paid===true ||
+  (Array.isArray(p.previous)&&p.previous.length) ||
+  String(p.pick||"").trim() ||
+  String(p.outPick||"").trim() ||
+  p.buyBackUsed===true
+ );
+}
+function genuineTeamsForRollover(p){
+ const teams=[];
+ (Array.isArray(p.previous)?p.previous:[]).forEach(t=>{
+  t=String(t||"").trim();
+  if(t&&!teams.includes(t))teams.push(t);
+ });
+ const current=String(p.pick||"").trim();
+ if(current&&!teams.includes(current))teams.push(current);
+ return teams;
+}
+async function loadRolloverData(forceRender=false){
+ if(!authUser||!supabaseClient||rolloverDataLoading)return;
+ rolloverDataLoading=true;
+ try{
+  rolloverBansByUser=new Map();
+  rolloverFrozenRanking=[];
+  rolloverJoinRequests=[];
+  currentRolloverJoinRequest=null;
+  rolloverExtraContribution=0;
+
+  if(Number(state.rollover||0)>0){
+   const ctx=await supabaseClient.rpc("get_rollover_context",{
+    p_competition_number:Number(state.competition||1),
+    p_rollover_number:Number(state.rollover||0)
+   });
+   if(ctx.error)throw ctx.error;
+   const context=Array.isArray(ctx.data)?ctx.data[0]:ctx.data;
+   if(context){
+    rolloverFrozenRanking=Array.isArray(context.ranking)?context.ranking:[];
+    rolloverExtraContribution=Number(context.extra_contribution||0)||0;
+   }
+
+   const bans=await supabaseClient.rpc("get_rollover_bans",{
+    p_competition_number:Number(state.competition||1),
+    p_rollover_number:Number(state.rollover||0)
+   });
+   if(bans.error)throw bans.error;
+   (Array.isArray(bans.data)?bans.data:[]).forEach(r=>{
+    const id=String(r.user_id||"");
+    if(!id)return;
+    const list=rolloverBansByUser.get(id)||[];
+    if(r.team&&!list.includes(r.team))list.push(r.team);
+    rolloverBansByUser.set(id,list);
+   });
+
+   if(authUser.role==="admin"){
+    const req=await supabaseClient.rpc("admin_list_rollover_join_requests",{
+     p_admin_user_id:authUser.user_id,
+     p_competition_number:Number(state.competition||1),
+     p_rollover_number:Number(state.rollover||0)
+    });
+    if(req.error)throw req.error;
+    rolloverJoinRequests=Array.isArray(req.data)?req.data:[];
+   }else{
+    const req=await supabaseClient.rpc("get_my_rollover_join_request",{
+     p_user_id:authUser.user_id,
+     p_competition_number:Number(state.competition||1),
+     p_rollover_number:Number(state.rollover||0)
+    });
+    if(req.error)throw req.error;
+    const rows=Array.isArray(req.data)?req.data:[];
+    currentRolloverJoinRequest=rows[0]||null;
+   }
+  }
+ }catch(e){
+  const msg=String(e?.message||"");
+  if(!msg.toLowerCase().includes("could not find the function")){
+   console.warn("Rollover data load failed",e);
+  }
+ }finally{
+  rolloverDataLoading=false;
+  if(forceRender)render();
+ }
+}
+async function requestRolloverJoin(){
+ const p=currentPlayer();
+ if(!p||!p.id)return toast("Player not found.");
+ if(Number(state.rollover||0)<1)return toast("Rollover entry is not currently available.");
+ const status=String(currentRolloverJoinRequest?.status||"").toLowerCase();
+ if(status==="pending")return toast("Your rollover entry request is already pending.");
+ if(status==="approved")return toast("Your rollover entry has already been approved.");
+ if(status==="declined")return toast("Your rollover entry request was declined for this rollover.");
+
+ const fee=Number(state.entryFee||0)*3;
+ if(!confirm(`Apply to join Rollover ${state.rollover} for £${fee}? You must pay the administrator before your place can be approved.`))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("request_rollover_join",{
+   p_user_id:p.id,
+   p_competition_number:Number(state.competition||1),
+   p_rollover_number:Number(state.rollover||0),
+   p_fee:fee
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Rollover entry request failed.");
+  toast(`Rollover entry requested. Please pay £${fee} to the administrator.`);
+  await loadRolloverData(true);
+ }catch(e){
+  console.error("Rollover join request failed",e);
+  toast(e.message||"Could not request rollover entry.");
+ }
+}
+async function approveRolloverJoin(requestId){
+ const req=(rolloverJoinRequests||[]).find(r=>String(r.id)===String(requestId));
+ if(!req)return toast("Request not found.");
+ if(!confirm(`Confirm £${Number(req.fee||Number(state.entryFee||0)*3)} has been received and accept ${req.display_name||req.username||"this player"} into Rollover ${state.rollover}?`))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_resolve_rollover_join",{
+   p_admin_user_id:authUser.user_id,
+   p_request_id:requestId,
+   p_approve:true,
+   p_base_entry_fee:Number(state.entryFee||0)
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Rollover entry approval failed.");
+
+  await syncUsersFromSupabase();
+  await loadRolloverData(false);
+  await loadBuyBackData(false);
+  const p=state.players.find(x=>String(x.id)===String(req.user_id));
+  const name=req.display_name||req.username||p?.name||"Player";
+  addActivity("player",`${name} approved to join Rollover ${state.rollover}`,`£${Number(req.fee||0)} rollover entry confirmed`);
+  try{await dbSaveActivityLog();}catch(e){console.warn("Rollover approval activity save failed",e);}
+  await sendAutomaticPlayerPush(p,"✅ Rollover Entry Approved",`Your £${Number(req.fee||0)} rollover entry has been approved. You are now in Rollover ${state.rollover}.`,"rollover_join_approved");
+  toast(`${name} accepted into the rollover.`);
+  render();
+ }catch(e){
+  console.error("Rollover join approval failed",e);
+  toast(e.message||"Could not approve rollover entry.");
+ }
+}
+async function declineRolloverJoin(requestId){
+ const req=(rolloverJoinRequests||[]).find(r=>String(r.id)===String(requestId));
+ if(!req)return toast("Request not found.");
+ if(!confirm(`Decline ${req.display_name||req.username||"this player's"} rollover entry request?`))return;
+ try{
+  const {data,error}=await supabaseClient.rpc("admin_resolve_rollover_join",{
+   p_admin_user_id:authUser.user_id,
+   p_request_id:requestId,
+   p_approve:false,
+   p_base_entry_fee:Number(state.entryFee||0)
+  });
+  if(error)throw error;
+  const result=Array.isArray(data)?data[0]:data;
+  if(!result?.success)throw new Error(result?.message||"Rollover entry decline failed.");
+  const p=state.players.find(x=>String(x.id)===String(req.user_id));
+  await sendAutomaticPlayerPush(p,"Rollover Entry Declined",`Your request to join Rollover ${state.rollover} was declined. Contact the administrator if you believe this is incorrect.`,"rollover_join_declined");
+  toast("Rollover entry request declined.");
+  await loadRolloverData(true);
+ }catch(e){
+  console.error("Rollover join decline failed",e);
+  toast(e.message||"Could not decline rollover entry.");
+ }
+}
+function rolloverJoinPlayerCard(p){
+ if(Number(state.rollover||0)<1||!p)return "";
+ if(p.alive)return "";
+ if(String(p.result||"")!=="waiting_rollover_application")return "";
+
+ const fee=Number(state.entryFee||0)*3;
+ const status=String(currentRolloverJoinRequest?.status||"").toLowerCase();
+ const bans=playerRolloverBans(p);
+ if(status==="pending"){
+  return `<div class="card"><div class="card-head"><strong>Join Rollover ${state.rollover}</strong><span class="badge yellow">Pending</span></div><div class="card-body"><div class="notice"><strong>Your application is pending.</strong><br>Please pay the administrator £${fee}. Your place can only be approved after payment is received.</div><div class="tiny" style="margin-top:10px">If approved, ${bans.length||rolloverFrozenRanking.length} ranked team restrictions will apply because you did not take part in the original run.</div></div></div>`;
+ }
+ if(status==="declined"){
+  return `<div class="card"><div class="card-head"><strong>Join Rollover ${state.rollover}</strong><span class="badge red">Declined</span></div><div class="card-body"><div class="notice">Your rollover entry request was declined. Contact the administrator if you believe this was a mistake.</div></div></div>`;
+ }
+ return `<div class="card"><div class="card-head"><strong>Join Rollover ${state.rollover}</strong><span class="badge orange">£${fee}</span></div><div class="card-body"><div class="notice">You did not take part in the original run, but you can apply to enter this rollover.<br><br><strong>Entry fee: £${fee}</strong> (${state.entryFee} original entry + ${state.entryFee} buy-back + ${state.entryFee} rollover entry). The full amount goes into the prize pot.<br><br>If approved, all ${rolloverFrozenRanking.length||state.round} teams from the published rollover ranking will be unavailable to you.</div><div class="actions" style="margin-top:12px"><button onclick="requestRolloverJoin()">Apply to Join Rollover</button></div></div></div>`;
+}
+function renderAdminRolloverJoinRequests(){
+ if(Number(state.rollover||0)<1)return "";
+ const pending=(rolloverJoinRequests||[]).filter(r=>String(r.status||"").toLowerCase()==="pending");
+ return `<div class="card"><div class="card-head"><strong>Rollover Entry Applications</strong><span class="badge orange">${pending.length}</span></div><div class="card-body">
+  ${pending.length?pending.map(r=>`<div class="buyback-admin-row">
+   <div class="buyback-admin-main"><div class="buyback-admin-name">${escapeHtml(r.display_name||r.username||"Player")}</div><div class="buyback-admin-meta">£${Number(r.fee||Number(state.entryFee||0)*3)} required · Rollover ${Number(r.rollover_number||state.rollover)}</div></div>
+   <div class="buyback-admin-actions"><button onclick="approveRolloverJoin('${escapeAttr(r.id)}')">Confirm Paid + Accept</button><button class="secondary" onclick="declineRolloverJoin('${escapeAttr(r.id)}')">Decline</button></div>
+  </div>`).join(""):`<div class="notice">No pending rollover entry applications.</div>`}
+ </div></div>`;
+}
 
 function rolloverRankingLength(){
  return Math.max(1,Number(state.round||1));
@@ -3468,6 +3675,10 @@ function renderRolloverPreview(){
  const candidates=state.players.filter(p=>p&&p.role!=="admin");
  return `<div class="rollover-preview-list">${candidates.map(p=>{
   const x=rolloverPreviewForPlayer(p);
+  const participated=playerParticipatedBeforeRollover(p);
+  if(!participated){
+   return `<div class="rollover-preview-row"><div><strong>${displayNameHtml(p)}</strong><div class="tiny">Did not enter original run · Would NOT return automatically</div></div><div class="tiny"><strong>May apply at rollover:</strong> £${Number(state.entryFee||0)*3} entry · all ${rolloverRankingLength()} ranked teams restricted</div></div>`;
+  }
   return `<div class="rollover-preview-row">
    <div><strong>${displayNameHtml(p)}</strong><div class="tiny">${x.genuine.length} genuine team${x.genuine.length===1?"":"s"} used · ${x.required} additional rollover ban${x.required===1?"":"s"}</div></div>
    <div class="tiny"><strong>Would ban:</strong> ${x.bans.length?x.bans.map(escapeHtml).join(", "):"No additional teams"}</div>
@@ -3504,9 +3715,9 @@ function adminTools(){
  <div class="card">
   <div class="card-head"><strong>📊 Rollover Team Ranking</strong><span class="badge yellow">Preview · Round ${n}</span></div>
   <div class="card-body">
-   <div class="notice" style="margin-bottom:14px">This is a <strong>preview/setup tool only</strong> during the current competition. It does not change any player's teams or Supabase data. If a rollover were started after Round ${n}, every returning player would have ${n} unavailable teams in total: genuine picks first, then extra bans taken from this ranking in order.</div>
+   <div class="notice" style="margin-bottom:14px">${Number(state.rollover||0)>0&&rolloverFrozenRanking.length?`<strong>Rollover ${state.rollover} ranking is frozen.</strong> The published ranking cannot change for this rollover.`:`This is a <strong>preview/setup tool</strong> during the current competition. If a rollover starts after Round ${n}, every returning player will have ${n} unavailable teams in total: genuine picks first, then extra bans taken from this ranking in order.`}</div>
    <div class="rollover-ranking-grid">
-    ${rolloverRankingDraft.map((chosen,i)=>`<div class="rollover-rank-row"><div class="rollover-rank-number">${i+1}</div><select onchange="setRolloverRank(${i},this.value)"><option value="">Choose team…</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${chosen===t?"selected":""} ${rolloverRankingDraft.some((x,j)=>j!==i&&x===t)?"disabled":""}>${escapeHtml(t)}</option>`).join("")}</select></div>`).join("")}
+    ${(Number(state.rollover||0)>0&&rolloverFrozenRanking.length?rolloverFrozenRanking:rolloverRankingDraft).map((chosen,i)=>`<div class="rollover-rank-row"><div class="rollover-rank-number">${i+1}</div>${Number(state.rollover||0)>0&&rolloverFrozenRanking.length?`<div class="rollover-frozen-team">${escapeHtml(chosen)}</div>`:`<select onchange="setRolloverRank(${i},this.value)"><option value="">Choose team…</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${chosen===t?"selected":""} ${rolloverRankingDraft.some((x,j)=>j!==i&&x===t)?"disabled":""}>${escapeHtml(t)}</option>`).join("")}</select>`}</div>`).join("")}
    </div>
    <button class="secondary" style="margin-top:14px" onclick="toggleRolloverPreview()">Preview Restrictions</button>
    <div id="rolloverRestrictionPreview" style="display:none;margin-top:14px"></div>
@@ -3524,7 +3735,7 @@ function round(){
      ${roundPlayers.map(p=>{const i=state.players.indexOf(p);const processed=p.result==="processed_win";return `<div class="round-compact-row final-correct">
        <div class="round-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="round-controls-8020">
-         <div><label>Team</label><select onchange="setPick(${i},this.value)" ${processed||adminPickSaveBusy.has(p.id)?'disabled':''}><option value="">Not picked</option>${state.teams.map(t=>`<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${p.previous.includes(t)&&p.pick!==t?'disabled':''}>${escapeHtml(t)}${p.previous.includes(t)&&p.pick!==t?' (used)':''}</option>`).join("")}</select></div>
+         <div><label>Team</label><select onchange="setPick(${i},this.value)" ${processed||adminPickSaveBusy.has(p.id)?'disabled':''}><option value="">Not picked</option>${state.teams.map(t=>{const used=p.previous.includes(t)&&p.pick!==t;const banned=playerRolloverBans(p).includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${p.pick===t?'selected':''} ${(used||banned)?'disabled':''}>${escapeHtml(t)}${used?' (used)':banned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
          <div><label>Result</label>${processed?`<div class="processed-result">🟩 Processed</div>`:`<select onchange="setResult(${i},this.value)"><option value="pending" ${p.result==='pending'?'selected':''}>?</option><option value="win" ${p.result==='win'?'selected':''}>🟩</option><option value="lose" ${p.result==='lose'?'selected':''}>🟥</option></select>`}</div>
        </div>
      </div>`}).join("")||`<div class="notice">No active Round ${state.round} picks.</div>`}
@@ -4000,6 +4211,8 @@ function myPick(){
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div>${pendingNotificationPermissionBlock()}</div></div>`;
  const buyBackCard=buyBackPlayerCard(p);
  const announcementCard=((state.announcement||"").trim()&&!hasDismissedCurrentAnnouncement())?`<div class="card announcement-card"><div class="card-head"><strong>📣 Announcement</strong></div><div class="card-body"><div class="notice" style="margin:0">${textToHtml(state.announcement)}</div><div class="actions" style="margin-top:12px"><button id="dismissAnnouncementBtn" class="small secondary" onclick="dismissCurrentAnnouncement()">Dismiss Announcement</button></div></div></div>`:"";
+ const rolloverJoinCard=rolloverJoinPlayerCard(p);
+ if(rolloverJoinCard)return `${announcementCard}${rolloverJoinCard}`;
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
  return `${announcementCard}${buyBackCard}<div class="player-top">
   <div>
@@ -4026,8 +4239,9 @@ function myPick(){
   ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
   <div class="pick-grid">
    <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${controlsDisabled?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const used=p.previous.includes(t)&&p.pick!==t;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${used?'disabled':''}>${escapeHtml(t)}${used?' (used)':''}</option>`}).join("")}</select></div>
+   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const previouslyUsed=p.previous.includes(t)&&p.pick!==t;const rolloverBanned=playerRolloverBans(p).includes(t)&&p.pick!==t;const blocked=previouslyUsed||rolloverBanned;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${blocked?'disabled':''}>${escapeHtml(t)}${previouslyUsed?' (used)':rolloverBanned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
   </div>
+  ${playerRolloverBans(p).length?`<div class="notice" style="margin-top:12px"><strong>Rollover restrictions:</strong> ${playerRolloverBans(p).map(escapeHtml).join(", ")}</div>`:""}
   ${p.locked?`<br><br><div class="notice">Your pick is locked for this round.</div>`:""}
   <br><br><button class="install-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
  </div></div>`;
@@ -5702,8 +5916,56 @@ async function startNextRound(){
  const oldRound=Number(state.round)||1;
  const missedBefore=alive().filter(p=>p.result!=="waiting_next_round"&&!String(p.pick||"").trim());
  const buyBackReadyBefore=alive().filter(p=>p.result==="waiting_next_round");
+ const rolloverExpected=alive().length===0;
 
- if(!confirm(`Finish Round ${oldRound} and start the next round? Players with no pick will be eliminated.`))return;
+ let rolloverPreparation=null;
+ if(rolloverExpected){
+  ensureRolloverRankingDraft();
+  if(rolloverRankingDraft.length!==oldRound||rolloverRankingDraft.some(x=>!String(x||"").trim())){
+   page="tools";
+   render();
+   return toast(`Complete all ${oldRound} Rollover Team Ranking positions before starting the rollover.`);
+  }
+  if(new Set(rolloverRankingDraft).size!==rolloverRankingDraft.length){
+   page="tools";render();return toast("The rollover ranking contains a duplicate team.");
+  }
+
+  const participants=state.players
+   .filter(p=>p&&p.approved&&!p.adminPlayer&&playerParticipatedBeforeRollover(p))
+   .map(p=>({user_id:p.id,genuine_picks:genuineTeamsForRollover(p)}));
+
+  rolloverPreparation={
+   target_rollover:Number(state.rollover||0)+1,
+   participants,
+   ranking:[...rolloverRankingDraft]
+  };
+
+  try{
+   const prep=await supabaseClient.rpc("admin_prepare_rollover",{
+    p_admin_user_id:authUser.user_id,
+    p_competition_number:Number(state.competition||1),
+    p_target_rollover:rolloverPreparation.target_rollover,
+    p_round_count:oldRound,
+    p_ranking:rolloverPreparation.ranking,
+    p_participants:rolloverPreparation.participants
+   });
+   if(prep.error)throw prep.error;
+   const result=Array.isArray(prep.data)?prep.data[0]:prep.data;
+   if(!result?.success)throw new Error(result?.message||"Rollover preparation failed.");
+  }catch(e){
+   console.error("Rollover preparation failed",e);
+   return toast("Rollover was NOT started: "+(e.message||"could not save ranking/eligibility"));
+  }
+ }
+
+ if(!confirm(rolloverExpected
+   ?`Start Rollover ${Number(state.rollover||0)+1}?\n\nThe ${oldRound}-team ranking will be frozen. Existing participants return unpaid with calculated restrictions. Players who never entered will stay out unless they apply and pay £${Number(state.entryFee||0)*3}.`
+   :`Finish Round ${oldRound} and start the next round? Players with no pick will be eliminated.`)){
+   if(rolloverPreparation){
+    try{await supabaseClient.rpc("admin_cancel_rollover_preparation",{p_admin_user_id:authUser.user_id,p_competition_number:Number(state.competition||1),p_target_rollover:rolloverPreparation.target_rollover});}catch(_){}
+   }
+   return;
+ }
 
  roundTransitionBusy=true;
  render();
@@ -5723,6 +5985,7 @@ async function startNextRound(){
   await syncUsersFromSupabase();
   await loadBuyBackData(false);
   await loadTeamStatistics(false);
+  await loadRolloverData(false);
 
   localStorage.setItem(storeKey,JSON.stringify(state));
 
@@ -6790,6 +7053,7 @@ async function boot(){
 
  try{await loadTeamStatistics(false);}catch(e){console.warn("Initial statistics load skipped",e);}
  try{await loadBuyBackData(false);}catch(e){console.warn("Initial buy-back load skipped",e);}
+ try{await loadRolloverData(false);}catch(e){console.warn("Initial rollover data load skipped",e);}
  if(authUser&&authUser.role==="admin")startAdminBuyBackWatch();
  try{await loadAdminPollData(false);}catch(e){console.warn("Initial poll load skipped",e);}
  if(authUser)try{await loadRandomDrawHistory(false);}catch(e){console.warn("Initial random draw history load skipped",e);}
@@ -6841,6 +7105,9 @@ window.notifyRollover=notifyRollover;
 window.spinRandomTeamWheel=spinRandomTeamWheel;
 window.setRolloverRank=setRolloverRank;
 window.toggleRolloverPreview=toggleRolloverPreview;
+window.requestRolloverJoin=requestRolloverJoin;
+window.approveRolloverJoin=approveRolloverJoin;
+window.declineRolloverJoin=declineRolloverJoin;
 window.updateRandomDrawPoolPreview=updateRandomDrawPoolPreview;
 window.openForgotUsername=openForgotUsername;
 window.closeForgotUsername=closeForgotUsername;
@@ -6861,6 +7128,7 @@ async function refreshSharedState(){
   await syncUsersFromSupabase();
   await loadChampionRecords();
   await loadRandomDrawHistory(false);
+  await loadRolloverData(false);
   const next=JSON.stringify({
    competition:state.competition,rollover:state.rollover,round:state.round,deadline:state.deadline,
    entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
