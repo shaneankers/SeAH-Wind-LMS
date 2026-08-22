@@ -1769,9 +1769,36 @@ body.player-mode .badge.orange{
  margin-top:0!important;
 }
 
+
+/* v126 simple Rules bold formatting */
+.rules-editor-toolbar{
+ display:flex;
+ align-items:center;
+ gap:9px;
+ margin:5px 0 7px;
+}
+.rules-format-btn{
+ width:34px!important;
+ min-width:34px!important;
+ height:30px!important;
+ min-height:30px!important;
+ padding:0!important;
+ border-radius:7px!important;
+ background:#f8fafc!important;
+ color:#0f172a!important;
+ border:1px solid #cbd5e1!important;
+ box-shadow:none!important;
+ font-size:15px!important;
+}
+.rules-format-btn:hover{
+ background:#eef2f7!important;
+ transform:none!important;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- v123: approved rollover entrants stay paid/alive after sync -->
+<!-- v126 admin Rules bold-format button -->
 <!-- v125 compact locked-pick spacing -->
 <!-- v124 complete rollover system + compact restrictions UI -->
 </head>
@@ -1997,7 +2024,26 @@ let authUser=readStoredAuthUser(),loginMode="login",role="admin",page="dashboard
 function save(){localStorage.setItem(storeKey,JSON.stringify(state));render()}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]||ch));}
-function textToHtml(value){return escapeHtml(value).replace(/\n/g,"<br>");}
+function textToHtml(value){
+ return escapeHtml(value)
+  .replace(/\*\*([^*\n][^*]*?)\*\*/g,"<strong>$1</strong>")
+  .replace(/\n/g,"<br>");
+}
+function boldRulesSelection(){
+ const el=document.getElementById("rulesText");
+ if(!el)return;
+ const start=el.selectionStart;
+ const end=el.selectionEnd;
+ if(start===end)return toast("Highlight the heading or text you want to make bold first.");
+ const selected=el.value.slice(start,end);
+ const before=el.value.slice(0,start);
+ const after=el.value.slice(end);
+ const already=selected.startsWith("**")&&selected.endsWith("**")&&selected.length>4;
+ const replacement=already?selected.slice(2,-2):`**${selected}**`;
+ el.value=before+replacement+after;
+ el.focus();
+ el.setSelectionRange(start,start+replacement.length);
+}
 function sortTextList(list){return [...new Set((list||[]).map(x=>String(x||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));}
 function paid(){return state.players.filter(p=>p.paid&&p.approved&&!isQueuedForNextCompetition(p))}
 function alive(){return state.players.filter(p=>p.paid&&p.approved&&p.alive&&!isQueuedForNextCompetition(p))}
@@ -5462,7 +5508,12 @@ function settings(){
    <div><label>Deadline label</label><input id="deadline" value="${escapeHtml(state.deadline||"")}" placeholder="Example: Friday 17:00"></div>
     <div><label>Exact pick cut-off</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"><div class="tiny">Players are automatically blocked at this exact UK date and time.</div></div>
   </div>
-  <label>Rules</label><textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
+  <label>Rules</label>
+  <div class="rules-editor-toolbar">
+   <button type="button" class="rules-format-btn" onclick="boldRulesSelection()" title="Make selected rules text bold"><strong>B</strong></button>
+   <span class="tiny">Highlight text, then press B to make it bold.</span>
+  </div>
+  <textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
   <br><br><button onclick="saveSettings()">Save Rules</button>
  </div></div>
 
