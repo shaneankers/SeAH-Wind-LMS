@@ -514,7 +514,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .action-pro .icon-wrap{
   background:rgba(255,255,255,.08)!important;
   border-color:rgba(255,255,255,.16)!important;
-  color:#ff6a2a!important;
+  color:var(--orange)!important;
 }
 .comp-header{
   background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
@@ -643,7 +643,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .stat-pro .icon-wrap{
   background:rgba(255,255,255,.08)!important;
   border-color:rgba(255,255,255,.16)!important;
-  color:#ff6a2a!important;
+  color:var(--orange)!important;
 }
 .stat-pro .icon-wrap.green{color:#22c55e!important}
 .stat-pro .icon-wrap.red{color:#ff5a5f!important}
@@ -1091,7 +1091,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .player-current{
   background:linear-gradient(135deg,#06b6d4,#0891b2)!important;
   border-color:rgba(255,255,255,.16)!important;
-  box-shadow:0 12px 30px rgba(234,88,12,.24);
+  box-shadow:0 12px 30px rgba(6,182,212,.24);
 }
 .player-current .kicker,
 .player-current .hero-num,
@@ -1117,14 +1117,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .player-stat:nth-child(3) .icon-wrap{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:var(--orange)!important;
 }
 .player-stat .icon-wrap svg,
 .player-stat .icon-wrap svg *,
 .player-stat:nth-child(3) .icon-wrap svg,
 .player-stat:nth-child(3) .icon-wrap svg *{
-  stroke:#ff6417!important;
-  color:#ff6417!important;
+  stroke:var(--orange)!important;
+  color:var(--orange)!important;
 }
 
 /* Pot card remains navy; only the money value is orange. */
@@ -1150,6 +1150,9 @@ body.player-mode .badge.orange{
   background:#cffafe;
   color:#0e7490;
 }
+/* Hall of Fame keeps each competition's original accent colour. */
+.badge.hof-comp-1{background:#ffedd5!important;color:#c2410c!important;}
+.badge.hof-comp-2{background:#cffafe!important;color:#0e7490!important;}
 
 /* Subtle real stadium backdrop across the top app area, no extra height. */
 .header{
@@ -1211,15 +1214,15 @@ body.player-mode .badge.orange{
 .stat-pro .icon-wrap{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:var(--orange)!important;
 }
 .stat-pro .icon-wrap svg,
 .stat-pro .icon-wrap svg *{
-  stroke:#ff6417!important;
-  color:#ff6417!important;
+  stroke:var(--orange)!important;
+  color:var(--orange)!important;
 }
 .stat-pro .icon-wrap.red{
-  color:#ff6417!important;
+  color:var(--orange)!important;
   background:#15283e!important;
   border-color:rgba(255,255,255,.12)!important;
 }
@@ -1228,11 +1231,11 @@ body.player-mode .badge.orange{
 .admin-hero .icon-wrap.navy{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:var(--orange)!important;
 }
 .admin-hero .icon-wrap.navy svg,
 .admin-hero .icon-wrap.navy svg *{
-  stroke:#ff6417!important;
+  stroke:var(--orange)!important;
 }
 
 /* Pot is a muted gold on both sides */
@@ -5037,7 +5040,7 @@ function playerHall(){
  });
  const r=sortedChamps.length?sortedChamps[0].name:"None";
  const champ=state.players.find(p=>p.name===r);
- return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">${escapeHtml(r)} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">${escapeHtml(c.name)} ${stars(p?p.wins:0)}</div><span class="badge orange">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
+ return `<div class="card"><div class="card-head"><strong>Reigning Champion</strong></div><div class="card-body">${r&&r!=="None"?`<div class="item"><div><div class="item-title">${escapeHtml(r)} ${stars(champ?champ.wins:0)}</div><div class="tiny">Current champion</div></div><span class="badge yellow">Champion</span></div>`:`<div class="notice">No champion yet.</div>`}</div></div><div class="card"><div class="card-head"><strong>Previous Winners</strong></div><div class="card-body list">${sortedChamps.length?sortedChamps.map(c=>{const p=state.players.find(x=>x.name===c.name);return `<div class="item"><div class="item-title">${escapeHtml(c.name)} ${stars(p?p.wins:0)}</div><span class="badge ${Number(c.comp)===1?'hof-comp-1':Number(c.comp)===2?'hof-comp-2':'orange'}">Competition #${c.comp}</span></div>`}).join(""):`<div class="notice">No previous winners yet.</div>`}</div></div>`
 }
 
 function rules(){
