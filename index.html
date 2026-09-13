@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
+<!-- v127 Text All Players mass SMS admin tool -->
 <!-- v122 cumulative rollover ban calculation -->
 <!-- v105 admin/player visual alignment and player polls -->
 <meta name="theme-color" content="#0f172a"/>
@@ -3309,9 +3310,65 @@ function dashboard(){
     <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span>${recipientLine('missing')}</div></div>
     <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span>${recipientLine('winner')}</div></div>
     <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span>${recipientLine('rollover')}</div></div>
+    <div class="action-pro" onclick="openMassSmsComposer()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Text All Players</strong><span>Open a mass SMS in Google Messages</span></div></div>
    </div>
   </div>
  </div>`;
+}
+
+function normaliseSmsNumber(value){
+ const raw=String(value||"").trim();
+ if(!raw)return "";
+ let n=raw.replace(/[^0-9+]/g,"");
+ if(n.startsWith("0044"))n="+44"+n.slice(4);
+ else if(n.startsWith("44")&&!n.startsWith("+"))n="+"+n;
+ else if(n.startsWith("0"))n="+44"+n.slice(1);
+ return /^\+?[0-9]{7,15}$/.test(n)?n:"";
+}
+function massSmsPlayers(){
+ const seen=new Set(), valid=[], missing=[];
+ (state.players||[]).forEach(p=>{
+  if(!p||p.adminPlayer||p.role==="admin")return;
+  const num=normaliseSmsNumber(p.contactNumber||p.contact_number||"");
+  if(!num){missing.push(p.name||p.username||"Unknown player");return;}
+  if(seen.has(num))return;
+  seen.add(num); valid.push({name:p.name||p.username||num,number:num});
+ });
+ return {valid,missing};
+}
+function closeMassSmsComposer(){
+ const el=document.getElementById("massSmsModal");
+ if(el)el.remove();
+}
+function openMassSmsComposer(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const {valid,missing}=massSmsPlayers();
+ if(!valid.length)return toast("No player phone numbers are stored in LMS yet.");
+ closeMassSmsComposer();
+ const overlay=document.createElement("div");
+ overlay.id="massSmsModal";
+ overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px";
+ const missingHtml=missing.length?`<div style="margin-top:12px;padding:10px 12px;border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;color:#9a3412;font-size:12px;line-height:1.45"><strong>${missing.length} player${missing.length===1?"":"s"} without a stored number:</strong><br>${missing.map(escapeHtml).join(", ")}<br><span style="color:#7c2d12">Add these few manually from your phone contacts in Google Messages before sending.</span></div>`:"";
+ overlay.innerHTML=`<div style="width:min(620px,100%);max-height:90vh;overflow:auto;background:white;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4)">
+  <div style="font-size:22px;font-weight:1000;color:#0f172a">📱 Text All Players</div>
+  <div style="margin-top:6px;color:#64748b;font-size:13px;line-height:1.45"><strong>${valid.length}</strong> stored player number${valid.length===1?"":"s"} will be loaded into your phone's messaging app.</div>
+  ${missingHtml}
+  <div style="margin-top:16px"><label>Message</label><textarea id="massSmsMessage" rows="7" placeholder="Type your announcement here...">⚽ SeAH Wind LMS Competition ${Number(state.competition||1)+1} is starting!\n\nOpen the LMS for the latest competition information and make sure you're ready to enter and make your pick.\n\nGood luck!</textarea></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button style="flex:1;min-width:210px" onclick="launchMassSms()">📱 Open Google Messages</button><button class="secondary" onclick="closeMassSmsComposer()">Cancel</button></div>
+  <div style="margin-top:10px;color:#64748b;font-size:11px;line-height:1.4">Google Messages will handle the actual SMS. Check the recipients before pressing Send. Your LMS does not send or read the texts itself.</div>
+ </div>`;
+ document.body.appendChild(overlay);
+ overlay.onclick=e=>{if(e.target===overlay)closeMassSmsComposer();};
+}
+function launchMassSms(){
+ const {valid}=massSmsPlayers();
+ if(!valid.length)return toast("No player phone numbers are available.");
+ const box=document.getElementById("massSmsMessage");
+ const message=String(box?.value||"").trim();
+ if(!message)return toast("Write your message first.");
+ const recipients=valid.map(x=>x.number).join(",");
+ const uri="sms:"+recipients+"?body="+encodeURIComponent(message);
+ window.location.href=uri;
 }
 
 function playerNotificationStatus(p){
