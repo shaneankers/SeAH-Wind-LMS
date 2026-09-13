@@ -3627,6 +3627,26 @@ async function checkNotificationSetupNudge(forceChoice=false){
  }
 }
 
+function exportSmsCsv(){
+ const seen=new Set();
+ const rows=state.players
+  .filter(p=>p.approved&&String(p.contactNumber||"").trim())
+  .map(p=>({name:displayName(p),phone:String(p.contactNumber||"").trim()}))
+  .filter(r=>{const key=r.phone.replace(/\s+/g,"");if(!key||seen.has(key))return false;seen.add(key);return true;});
+ if(!rows.length)return toast("No player phone numbers to export.");
+ const csv=["name,phone_number",...rows.map(r=>`"${String(r.name||"").replace(/"/g,'""')}","${String(r.phone||"").replace(/"/g,'""')}"`)].join("\r\n");
+ const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+ a.href=url;
+ a.download=`SeAH_Wind_LMS_SMS_Contacts_${new Date().toISOString().slice(0,10)}.csv`;
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ toast(`Exported ${rows.length} phone number${rows.length===1?"":"s"}.`);
+}
+
 function players(){
  const pending=state.players.filter(p=>!p.approved), approved=state.players.filter(p=>p.approved);
  return `<div class="card">
@@ -3642,7 +3662,7 @@ function players(){
  </div>
 
  <div class="card">
-   <div class="card-head"><strong>Players</strong><span class="badge orange">${approved.length}</span></div>
+   <div class="card-head"><strong>Players</strong><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="small secondary" onclick="exportSmsCsv()">Export SMS CSV</button><span class="badge orange">${approved.length}</span></div></div>
    <div class="card-body list">
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
        <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
