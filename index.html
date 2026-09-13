@@ -4,7 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v127 Text All Players mass SMS admin tool -->
+<!-- v134 Competition 2 black + red theme -->
+<!-- v128 Competition 2 visual refresh -->
+<!-- v133 compact mobile players + notification nudge inside Edit -->
 <!-- v122 cumulative rollover ban calculation -->
 <!-- v105 admin/player visual alignment and player polls -->
 <meta name="theme-color" content="#0f172a"/>
@@ -12,16 +14,16 @@
 <style>
 :root{
   --bg:#0f172a;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e5e7eb;
-  --orange:#f97316;--orange2:#ea580c;--yellow:#fbbf24;--red:#dc2626;--green:#16a34a;
+  --orange:#ef233c;--orange2:#b91c1c;--yellow:#fbbf24;--red:#dc2626;--green:#16a34a;
   --shadow:0 24px 60px rgba(0,0,0,.25);--radius:22px;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at 20% 0%,rgba(249,115,22,.32),transparent 32%),radial-gradient(circle at 80% 8%,rgba(251,191,36,.22),transparent 28%),linear-gradient(135deg,#0f172a,#111827 55%,#020617);color:var(--ink);min-height:100vh}
+body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at 20% 0%,rgba(239,35,60,.30),transparent 32%),radial-gradient(circle at 80% 8%,rgba(251,191,36,.22),transparent 28%),linear-gradient(135deg,#0f172a,#111827 55%,#030303);color:var(--ink);min-height:100vh}
 .app{max-width:1180px;margin:auto;padding:20px}
 .header{display:flex;align-items:center;gap:13px;color:white;margin-bottom:18px}
-.logo{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--orange),var(--yellow));display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;box-shadow:0 18px 45px rgba(249,115,22,.38);line-height:.9}
+.logo{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--orange),var(--yellow));display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;box-shadow:0 18px 45px rgba(239,35,60,.38);line-height:.9}
 .logo-main{font-size:22px;font-weight:1000;letter-spacing:-1px}.logo-sub{font-size:13px;font-weight:1000;letter-spacing:-.7px;white-space:nowrap}
-h1{font-size:28px;margin:0;letter-spacing:-.04em}.sub{font-size:14px;color:#fed7aa;margin:4px 0 0}
+h1{font-size:28px;margin:0;letter-spacing:-.04em}.sub{font-size:14px;color:#fecdd3;margin:4px 0 0}
 .shell{display:grid;grid-template-columns:250px 1fr;gap:18px}
 .sidebar,.main,.login-wrap{background:rgba(255,255,255,.98);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
 .sidebar{padding:16px;height:max-content}.profile{border:1px solid var(--line);border-radius:18px;padding:14px;background:linear-gradient(180deg,#fff,#f8fafc);margin-bottom:14px}.profile strong{font-size:17px}
@@ -30,18 +32,18 @@ h1{font-size:28px;margin:0;letter-spacing:-.04em}.sub{font-size:14px;color:#fed7
 .tiny{font-size:12px;color:var(--muted)}.muted{font-size:14px;color:var(--muted)}
 .nav{display:flex;flex-direction:column;gap:8px}.nav button{background:#1f2937;color:#dbe3f5;text-align:left}.nav button.active{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827}
 button{border:0;border-radius:14px;padding:11px 14px;font-weight:900;cursor:pointer;background:var(--orange);color:white;transition:.15s ease}
-button:hover{background:var(--orange2);transform:translateY(-1px)}button.secondary{background:#334155}button.yellow{background:var(--yellow);color:#111827}button.red{background:var(--red)}button.green{background:var(--green)}button.ghost{background:#fff7ed;color:#9a3412}button.small{padding:8px 10px;border-radius:11px;font-size:12px}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+button:hover{background:var(--orange2);transform:translateY(-1px)}button.secondary{background:#334155}button.yellow{background:var(--yellow);color:#111827}button.red{background:var(--red)}button.green{background:var(--green)}button.ghost{background:#fff1f2;color:#9f1239}button.small{padding:8px 10px;border-radius:11px;font-size:12px}button:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.mode-switch button{background:#1f2937;color:#dbe3f5}.mode-switch button.active{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827}
 .logout-btn{width:100%;margin-top:12px;background:#1f2937;color:#dbe3f5}
 .topline{padding:18px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fafc)}
 .title{font-size:21px;font-weight:1000;margin:0;letter-spacing:-.03em}.body{padding:20px}
-.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#e2e8f0;color:#334155;white-space:nowrap}.badge.orange{background:#ffedd5;color:#9a3412}.badge.yellow{background:#fef3c7;color:#78350f}.badge.green{background:#dcfce7;color:#166534}.badge.red{background:#fee2e2;color:#991b1b}.badge.dark{background:#1f2937;color:#fff}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#e2e8f0;color:#334155;white-space:nowrap}.badge.orange{background:#ffe4e6;color:#9f1239}.badge.yellow{background:#fef3c7;color:#78350f}.badge.green{background:#dcfce7;color:#166534}.badge.red{background:#fee2e2;color:#991b1b}.badge.dark{background:#1f2937;color:#fff}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.stat{border:1px solid var(--line);border-radius:18px;background:#fff;padding:15px}.stat .label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:1000}.stat .value{font-size:28px;font-weight:1000;letter-spacing:-.05em}
 .card{border:1px solid var(--line);border-radius:20px;background:white;overflow:hidden;margin-bottom:14px}.card-head{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.card-head strong{font-size:16px}.card-body{padding:16px}.list{display:flex;flex-direction:column;gap:10px}
 .item,.admin-row,.compact-player{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.item-title,.admin-row-title{font-weight:950}.admin-row-detail,.compact-detail{font-size:12px;color:var(--muted);margin-top:2px}.actions{display:flex;flex-wrap:wrap;gap:8px}
 .admin-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.admin-action-grid button{width:100%}
 .round-row{display:grid;grid-template-columns:1fr;gap:10px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px}.round-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;padding:11px 12px;font:inherit;background:white;color:var(--ink);outline:none}input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(249,115,22,.16)}label{font-size:12px;font-weight:950;color:#334155;display:block;margin-bottom:6px}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.notice{border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:18px;padding:14px;line-height:1.45}
+input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;padding:11px 12px;font:inherit;background:white;color:var(--ink);outline:none}input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(239,35,60,.16)}label{font-size:12px;font-weight:950;color:#334155;display:block;margin-bottom:6px}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.notice{border:1px solid #fecdd3;background:#fff1f2;color:#9f1239;border-radius:18px;padding:14px;line-height:1.45}
 .comp-header{background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827;border-radius:22px;padding:18px;margin-bottom:16px}.comp-header h2{margin:0 0 6px;font-size:24px;letter-spacing:-.04em}.comp-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .compact-player{display:grid;grid-template-columns:1fr auto}.compact-name{font-weight:950}.compact-status{font-size:12px;font-weight:950;border-radius:999px;padding:5px 8px}.compact-status.ok{background:#dcfce7;color:#166534}.compact-status.wait{background:#fef3c7;color:#78350f}.compact-status.out{background:#fee2e2;color:#991b1b}
 .install-button{width:100%;padding:15px;border-radius:18px;background:linear-gradient(135deg,var(--orange),var(--yellow));color:#111827;font-size:16px}.confirmed-btn{background:var(--green)!important;color:white!important;cursor:default!important}
@@ -269,7 +271,7 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 .round-controls-8020 select option[value="win"]{color:#16a34a;font-weight:900}
 .round-controls-8020 select option[value="lose"]{color:#dc2626;font-weight:900}
 
-.auth-link{background:transparent!important;color:#9a3412!important;padding:10px 0!important;width:100%;text-align:center;box-shadow:none!important}
+.auth-link{background:transparent!important;color:#9f1239!important;padding:10px 0!important;width:100%;text-align:center;box-shadow:none!important}
 
 .sidebar.admin-mode .profile{
   background:linear-gradient(135deg,#fde047 0%,#ffffff 100%) !important;
@@ -290,15 +292,15 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 
 
 .admin-alert{
-  border:2px solid #f97316;
-  background:#fff7ed;
-  color:#7c2d12;
+  border:2px solid #ef233c;
+  background:#fff1f2;
+  color:#881337;
   border-radius:18px;
   padding:14px;
   margin-bottom:14px;
   line-height:1.45;
 }
-.admin-alert strong{display:block;font-size:16px;margin-bottom:4px;color:#9a3412}
+.admin-alert strong{display:block;font-size:16px;margin-bottom:4px;color:#9f1239}
 
 
 .reset-required-box{
@@ -320,15 +322,15 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 
 /* ===== v22 Professional UI Rebuild ===== */
 :root{
-  --navy:#061426;
-  --navy2:#0a213d;
-  --navy3:#102f55;
+  --navy:#090909;
+  --navy2:#181818;
+  --navy3:#2a2a2a;
   --card:#ffffff;
   --ink:#071426;
   --muted:#64748b;
   --line:#e2e8f0;
-  --orange:#ff5a1f;
-  --orange2:#f4511e;
+  --orange:#ef233c;
+  --orange2:#b91c1c;
   --red:#dc2626;
   --green:#16a34a;
   --yellow:#f59e0b;
@@ -338,15 +340,15 @@ input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:14px;pad
 *{box-sizing:border-box}
 body{
   background:
-    radial-gradient(circle at 10% 0%,rgba(255,90,31,.18),transparent 25%),
-    linear-gradient(135deg,#071426,#020817 65%,#020617)!important;
+    radial-gradient(circle at 10% 0%,rgba(239,35,60,.18),transparent 25%),
+    linear-gradient(135deg,#071426,#050505 65%,#030303)!important;
   color:var(--ink);
 }
 .app{max-width:1420px;padding:18px}
 .header{color:white;margin-bottom:16px;align-items:center}
 .logo{
   width:82px!important;height:82px!important;border-radius:22px!important;
-  background:#061426 url("icon-192.png") center/cover no-repeat!important;
+  background:#090909 url("icon-192.png") center/cover no-repeat!important;
   box-shadow:0 20px 50px rgba(0,0,0,.38)!important;
 }
 .logo-main,.logo-sub{display:none!important}
@@ -354,7 +356,7 @@ body{
 #onlineStatus{background:#dcfce7!important;color:#14532d!important;border:1px solid rgba(22,163,74,.18)}
 .shell{grid-template-columns:280px 1fr;gap:20px}
 .sidebar{
-  background:linear-gradient(180deg,#071a31,#031021)!important;
+  background:linear-gradient(180deg,#101010,#050505)!important;
   color:white;border:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow);
 }
 .main,.login-wrap{background:#f8fafc!important;border:1px solid rgba(255,255,255,.55);box-shadow:var(--shadow)}
@@ -369,24 +371,24 @@ body{
 .sidebar.player-mode .profile strong,.sidebar.admin-mode .profile strong{color:var(--ink)!important;font-size:24px!important;display:block!important}
 .mode-switch{background:rgba(255,255,255,.06);border-radius:18px;padding:6px}
 .mode-switch button{background:transparent!important;color:#dbeafe!important;box-shadow:none;border-radius:13px}
-.mode-switch button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important;box-shadow:0 12px 28px rgba(255,90,31,.28)}
+.mode-switch button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important;box-shadow:0 12px 28px rgba(239,35,60,.28)}
 .nav button{background:transparent!important;color:#dbeafe!important;border:1px solid transparent;border-radius:15px;padding:12px 14px;box-shadow:none}
 .nav button:hover{background:rgba(255,255,255,.08)!important;transform:none}
-.nav button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:#fff!important;box-shadow:0 14px 30px rgba(255,90,31,.28)}
+.nav button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:#fff!important;box-shadow:0 14px 30px rgba(239,35,60,.28)}
 .logout-btn{background:rgba(255,255,255,.06)!important;color:#e2e8f0!important;border:1px solid rgba(255,255,255,.16)!important}
 .card,.stat,.item,.admin-row,.compact-player,.league-box,.round-compact-row,.player-list-row{
   background:#fff!important;border:1px solid var(--line)!important;box-shadow:0 12px 28px rgba(2,8,23,.05);
 }
 .card{border-radius:22px}.card-head{background:white!important;border-bottom:1px solid #edf2f7}
-button{background:linear-gradient(135deg,var(--orange),var(--orange2));color:white;box-shadow:0 10px 22px rgba(255,90,31,.18)}
+button{background:linear-gradient(135deg,var(--orange),var(--orange2));color:white;box-shadow:0 10px 22px rgba(239,35,60,.18)}
 button:hover{background:linear-gradient(135deg,var(--orange2),var(--orange))}
-button.secondary{background:#0f2747!important}button.ghost{background:#fff7ed!important;color:#9a3412!important;box-shadow:none}
+button.secondary{background:#202020!important}button.ghost{background:#fff1f2!important;color:#9f1239!important;box-shadow:none}
 button.yellow{background:#f59e0b!important;color:#111827!important}button.green{background:#16a34a!important;color:white!important}button.red{background:#dc2626!important;color:white!important}
-.badge.orange{background:#ffedd5;color:#c2410c}.badge.dark{background:#071a31;color:#fff}
-.login-hero{background:linear-gradient(145deg,#071a31,#020817)!important;color:white!important}
+.badge.orange{background:#ffe4e6;color:#be123c}.badge.dark{background:#101010;color:#fff}
+.login-hero{background:linear-gradient(145deg,#101010,#050505)!important;color:white!important}
 .big-logo{
   width:122px!important;height:122px!important;border-radius:28px!important;
-  background:#061426 url("icon-512.png") center/cover no-repeat!important;
+  background:#090909 url("icon-512.png") center/cover no-repeat!important;
   box-shadow:0 22px 55px rgba(0,0,0,.38)
 }
 .big-logo .logo-main,.big-logo .logo-sub{display:none!important}
@@ -394,17 +396,17 @@ button.yellow{background:#f59e0b!important;color:#111827!important}button.green{
 .login-tabs button{background:#eef2f7!important;color:var(--ink)!important;box-shadow:none}
 .login-tabs button.active{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important}
 .install-button{background:linear-gradient(135deg,var(--orange),var(--orange2))!important;color:white!important}
-.notice{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+.notice{background:#fff1f2;border-color:#fecdd3;color:#9f1239}
 input,select,textarea{border-color:#cbd5e1;background:#fff;color:var(--ink)}
-input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(255,90,31,.15)}
-.toast{background:#061426;color:white;border:1px solid rgba(255,255,255,.12)}
-.admin-alert{background:#fff7ed;border-color:var(--orange);color:#7c2d12}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(239,35,60,.15)}
+.toast{background:#090909;color:white;border:1px solid rgba(255,255,255,.12)}
+.admin-alert{background:#fff1f2;border-color:var(--orange);color:#881337}
 
 /* SVG icon system */
 .svg-icon{width:26px;height:26px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
 .icon-wrap{
   width:52px;height:52px;border-radius:17px;
-  background:#fff7ed;border:1px solid #fed7aa;color:var(--orange);
+  background:#fff1f2;border:1px solid #fecdd3;color:var(--orange);
   display:flex;align-items:center;justify-content:center;flex:0 0 auto;
 }
 .icon-wrap.navy{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:white}
@@ -415,7 +417,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* Admin dashboard */
 .admin-hero{
-  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e);
+  background:linear-gradient(135deg,#101010,#090909 58%,#1b1b1b);
   border-radius:22px;color:white;padding:24px;margin-bottom:18px;
   display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;
   box-shadow:0 18px 48px rgba(2,8,23,.22)
@@ -468,7 +470,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* Player dashboard */
 .player-top{
-  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e);
+  background:linear-gradient(135deg,#101010,#090909 58%,#1b1b1b);
   border-radius:22px;color:white;padding:24px;margin-bottom:18px;
   display:grid;grid-template-columns:1.15fr .85fr;gap:18px;
   box-shadow:0 18px 48px rgba(2,8,23,.22)
@@ -480,7 +482,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 }
 .player-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
 .player-stat{
-  background:linear-gradient(135deg,#071a31,#061426);
+  background:linear-gradient(135deg,#101010,#090909);
   color:white;border-radius:18px;padding:17px;display:flex;align-items:center;gap:12px;
   box-shadow:0 14px 30px rgba(2,8,23,.18)
 }
@@ -504,7 +506,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 /* ===== v23 Specific Polish ===== */
 .admin-hero-cell .hero-sub{display:none}
 .action-pro{
-  background:linear-gradient(135deg,#071a31,#061426)!important;
+  background:linear-gradient(135deg,#101010,#090909)!important;
   color:white!important;
   border:1px solid rgba(255,255,255,.12)!important;
 }
@@ -513,10 +515,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .action-pro .icon-wrap{
   background:rgba(255,255,255,.08)!important;
   border-color:rgba(255,255,255,.16)!important;
-  color:#ff6a2a!important;
+  color:#ff3b30!important;
 }
 .comp-header{
-  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  background:linear-gradient(135deg,#101010,#090909 58%,#1b1b1b)!important;
   color:white!important;
   box-shadow:0 18px 48px rgba(2,8,23,.22)!important;
 }
@@ -534,8 +536,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .activity-row:last-child{border-bottom:0}
 .activity-left{display:flex;align-items:center;gap:10px;min-width:0}
 .activity-icon{
-  width:38px;height:38px;border-radius:13px;background:#fff7ed;
-  border:1px solid #fed7aa;color:var(--orange);
+  width:38px;height:38px;border-radius:13px;background:#fff1f2;
+  border:1px solid #fecdd3;color:var(--orange);
   display:flex;align-items:center;justify-content:center;font-weight:1000;
 }
 .activity-main{font-weight:950;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -632,7 +634,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* ===== v24 Stat Cards + Competition Header Polish ===== */
 .stat-pro{
-  background:linear-gradient(135deg,#071a31,#061426)!important;
+  background:linear-gradient(135deg,#101010,#090909)!important;
   color:white!important;
   border:1px solid rgba(255,255,255,.12)!important;
   box-shadow:0 16px 34px rgba(2,8,23,.18)!important;
@@ -642,13 +644,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .stat-pro .icon-wrap{
   background:rgba(255,255,255,.08)!important;
   border-color:rgba(255,255,255,.16)!important;
-  color:#ff6a2a!important;
+  color:#ff3b30!important;
 }
 .stat-pro .icon-wrap.green{color:#22c55e!important}
 .stat-pro .icon-wrap.red{color:#ff5a5f!important}
 
 .comp-header{
-  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  background:linear-gradient(135deg,#101010,#090909 58%,#1b1b1b)!important;
   color:white!important;
   padding:24px!important;
   border-radius:22px!important;
@@ -728,6 +730,70 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   color:#991b1b;
 }
 
+/* v128 Competition refresh — player dashboard */
+.comp-season-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.comp-season-label{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:7px 11px;
+  border-radius:999px;
+  background:linear-gradient(135deg,#ef233c,#f59e0b);
+  color:#fff;
+  font-size:12px;
+  font-weight:1000;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  box-shadow:0 10px 24px rgba(249,115,22,.28);
+}
+.comp-new-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 9px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.09);
+  color:#fde68a;
+  font-size:10px;
+  font-weight:1000;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.player-top{
+  position:relative;
+  overflow:hidden;
+}
+.player-top:after{
+  content:""!important;
+  display:block!important;
+  position:absolute;
+  width:210px;
+  height:210px;
+  right:-78px;
+  top:-92px;
+  border-radius:50%;
+  border:30px solid rgba(249,115,22,.10);
+  pointer-events:none;
+}
+.player-top>div{position:relative;z-index:1}
+.player-stat{
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.player-stat:hover{
+  transform:translateY(-2px);
+  box-shadow:0 18px 36px rgba(2,8,23,.24)!important;
+}
+@media(max-width:560px){
+  .comp-season-label{font-size:11px;padding:6px 9px}
+  .comp-new-badge{font-size:9px}
+}
+
 /* Player dashboard hero balance */
 .player-top{
   grid-template-columns:1.45fr .55fr!important;
@@ -768,7 +834,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 /* v31 launch polish */
 .recipient-line{
   margin-top:8px!important;
-  color:#ff5a1f!important;
+  color:#ef233c!important;
   font-size:14px!important;
   font-weight:400!important;
   line-height:1.25!important;
@@ -848,7 +914,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 /* v92 admin action colour tidy */
 .player-edit-panel button.small.secondary,
 .player-edit-panel button.small.ghost{
-  background:#0f2747!important;
+  background:#202020!important;
   color:white!important;
   box-shadow:0 10px 22px rgba(15,39,71,.16)!important;
 }
@@ -869,7 +935,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   margin-bottom:18px;
 }
 .stats-summary-card{
-  background:linear-gradient(135deg,#071a31,#061426);
+  background:linear-gradient(135deg,#101010,#090909);
   color:white;
   border-radius:18px;
   padding:16px 18px;
@@ -939,8 +1005,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  background:#ffedd5;
-  color:#c2410c;
+  background:#ffe4e6;
+  color:#be123c;
   font-size:11px;
   font-weight:1000;
   flex:0 0 auto;
@@ -992,9 +1058,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   display:flex;
   align-items:center;
   padding:11px;
-  border:1px solid #fed7aa;
-  background:#fff7ed;
-  color:#9a3412;
+  border:1px solid #fecdd3;
+  background:#fff1f2;
+  color:#9f1239;
   border-radius:14px;
   font-size:11px;
   line-height:1.4;
@@ -1012,7 +1078,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* Keep the player hero clean and navy. */
 .player-top{
-  background:linear-gradient(135deg,#071a31,#061426 58%,#0b2b4e)!important;
+  background:linear-gradient(135deg,#101010,#090909 58%,#1b1b1b)!important;
   border:1px solid rgba(255,255,255,.08)!important;
 }
 .player-top::before,
@@ -1024,9 +1090,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* Current Pick panel: orange panel is fine, but all wording stays white. */
 .player-current{
-  background:linear-gradient(135deg,#f97316,#ea580c)!important;
+  background:linear-gradient(135deg,#ef233c,#b91c1c)!important;
   border-color:rgba(255,255,255,.16)!important;
-  box-shadow:0 12px 30px rgba(234,88,12,.24);
+  box-shadow:0 12px 30px rgba(185,28,28,.24);
 }
 .player-current .kicker,
 .player-current .hero-num,
@@ -1036,7 +1102,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 
 /* Player summary cards mirror the admin cards. */
 .player-stat{
-  background:linear-gradient(135deg,#071a31,#061426)!important;
+  background:linear-gradient(135deg,#101010,#090909)!important;
   border-top:0!important;
   color:white!important;
 }
@@ -1052,19 +1118,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .player-stat:nth-child(3) .icon-wrap{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:#ff3b30!important;
 }
 .player-stat .icon-wrap svg,
 .player-stat .icon-wrap svg *,
 .player-stat:nth-child(3) .icon-wrap svg,
 .player-stat:nth-child(3) .icon-wrap svg *{
-  stroke:#ff6417!important;
-  color:#ff6417!important;
+  stroke:#ff3b30!important;
+  color:#ff3b30!important;
 }
 
 /* Pot card remains navy; only the money value is orange. */
 .player-stat:nth-child(3){
-  background:linear-gradient(135deg,#071a31,#061426)!important;
+  background:linear-gradient(135deg,#101010,#090909)!important;
   border-color:transparent!important;
 }
 .player-stat:nth-child(3) .num{
@@ -1079,11 +1145,11 @@ body.player-mode .card-head{
   border-top:0!important;
 }
 body.player-mode button:not(.secondary):not(.logout-btn){
-  background:linear-gradient(135deg,#f97316,#ea580c);
+  background:linear-gradient(135deg,#ef233c,#b91c1c);
 }
 body.player-mode .badge.orange{
-  background:#ffedd5;
-  color:#c2410c;
+  background:#ffe4e6;
+  color:#be123c;
 }
 
 /* Subtle real stadium backdrop across the top app area, no extra height. */
@@ -1136,7 +1202,7 @@ body.player-mode .badge.orange{
 
 /* Admin summary cards now mirror player summary cards */
 .stat-pro{
-  background:linear-gradient(135deg,#071a31,#061426)!important;
+  background:linear-gradient(135deg,#101010,#090909)!important;
   border:1px solid rgba(255,255,255,.10)!important;
   color:white!important;
   box-shadow:0 14px 30px rgba(2,8,23,.18)!important;
@@ -1146,15 +1212,15 @@ body.player-mode .badge.orange{
 .stat-pro .icon-wrap{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:#ff3b30!important;
 }
 .stat-pro .icon-wrap svg,
 .stat-pro .icon-wrap svg *{
-  stroke:#ff6417!important;
-  color:#ff6417!important;
+  stroke:#ff3b30!important;
+  color:#ff3b30!important;
 }
 .stat-pro .icon-wrap.red{
-  color:#ff6417!important;
+  color:#ff3b30!important;
   background:#15283e!important;
   border-color:rgba(255,255,255,.12)!important;
 }
@@ -1163,11 +1229,11 @@ body.player-mode .badge.orange{
 .admin-hero .icon-wrap.navy{
   background:#15283e!important;
   border:1px solid rgba(255,255,255,.12)!important;
-  color:#ff6417!important;
+  color:#ff3b30!important;
 }
 .admin-hero .icon-wrap.navy svg,
 .admin-hero .icon-wrap.navy svg *{
-  stroke:#ff6417!important;
+  stroke:#ff3b30!important;
 }
 
 /* Pot is a muted gold on both sides */
@@ -1206,7 +1272,7 @@ body.player-mode .badge.orange{
 .poll-results{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 .poll-result-row{display:grid;grid-template-columns:minmax(110px,1fr) 2fr auto;gap:10px;align-items:center}
 .poll-bar{height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden}
-.poll-bar > span{display:block;height:100%;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:999px}
+.poll-bar > span{display:block;height:100%;background:linear-gradient(90deg,#ef233c,#ff5a5f);border-radius:999px}
 .poll-vote-count{font-weight:950;color:var(--ink);min-width:34px;text-align:right}
 
 /* Poll popup */
@@ -1242,7 +1308,7 @@ body.player-mode .badge.orange{
   cursor:pointer;
   background:#fff;
 }
-#playerPollModal .poll-choice:hover{border-color:#fb923c;background:#fff7ed}
+#playerPollModal .poll-choice:hover{border-color:#ff5a5f;background:#fff1f2}
 #playerPollModal .poll-choice input{width:auto;margin:0}
 #playerPollModal .poll-choice span{font-weight:850;color:var(--ink)}
 
@@ -1275,7 +1341,7 @@ body.player-mode .badge.orange{
 .auto-note-name{font-size:12px;font-weight:950;color:var(--ink);line-height:1.2}
 .auto-note-row input[type="text"]{padding:8px 10px;border-radius:10px;font-size:12px;min-width:0}
 .auto-note-toggle{display:flex;justify-content:center;align-items:center}
-.auto-note-toggle input{width:18px;height:18px;margin:0;accent-color:#f97316}
+.auto-note-toggle input{width:18px;height:18px;margin:0;accent-color:#ef233c}
 @media(max-width:700px){
  .auto-note-row{grid-template-columns:110px minmax(0,1fr) 40px;gap:7px;padding:7px}
  .auto-note-name,.auto-note-row input[type="text"]{font-size:11px}
@@ -1286,20 +1352,20 @@ body.player-mode .badge.orange{
 .live-football-shell{display:flex;flex-direction:column;gap:14px}
 .live-football-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .live-football-title{display:flex;align-items:center;gap:10px}
-.live-football-title-icon{width:38px;height:38px;border-radius:12px;background:#fff2e8;color:#f97316;display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid #fed7aa}
+.live-football-title-icon{width:38px;height:38px;border-radius:12px;background:#fff2e8;color:#ef233c;display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid #fecdd3}
 .live-football-title h2{margin:0;font-size:22px;color:var(--ink)}
 .live-football-title p{margin:2px 0 0;color:#64748b;font-size:12px}
-.live-football-refresh{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;border:1px solid #fed7aa;background:#fff8f1;color:#9a3412;font-size:11px;font-weight:900;cursor:pointer}
+.live-football-refresh{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;border:1px solid #fecdd3;background:#fff8f1;color:#9f1239;font-size:11px;font-weight:900;cursor:pointer}
 .live-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;border:1px solid var(--line);border-radius:16px;background:#fff}
 .live-mode-tabs button{border:0;background:#f8fafc;color:#334155;border-radius:12px;padding:11px 12px;font-weight:1000;box-shadow:none}
 .live-mode-tabs button.active{background:linear-gradient(135deg,#ff6a16,#ff4d1f);color:#fff;box-shadow:0 8px 18px rgba(249,115,22,.22)}
 .live-league-tabs{display:flex;flex-wrap:wrap;gap:8px}
 .live-league-tabs button{background:#fff;color:#0f172a;border:1px solid #dbe3ee;border-radius:12px;padding:9px 13px;font-size:12px;font-weight:950;box-shadow:none}
-.live-league-tabs button.active{background:#fff2e8;color:#c2410c;border-color:#fb923c;box-shadow:inset 0 0 0 1px #fb923c}
+.live-league-tabs button.active{background:#fff2e8;color:#be123c;border-color:#ff5a5f;box-shadow:inset 0 0 0 1px #ff5a5f}
 .live-football-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
 .live-panel{border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}
 .live-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;border-bottom:1px solid #edf2f7}
-.live-panel-head strong{color:#ea580c;font-size:14px}
+.live-panel-head strong{color:#b91c1c;font-size:14px}
 .live-panel-meta{font-size:10px;color:#64748b;font-weight:900}
 .live-date-group{padding:7px 12px;background:#f8fafc;border-top:1px solid #edf2f7;border-bottom:1px solid #edf2f7;color:#64748b;font-size:10px;font-weight:1000;text-transform:uppercase;letter-spacing:.04em}
 .live-score-list{display:flex;flex-direction:column}
@@ -1311,7 +1377,7 @@ body.player-mode .badge.orange{
 .live-score-value.pre{font-size:12px;color:#64748b}
 .live-score-status{font-size:9px;font-weight:1000;text-transform:uppercase;letter-spacing:.03em;color:#64748b}
 .live-score-status.live{color:#dc2626}
-.live-score-status.ft{color:#ea580c}
+.live-score-status.ft{color:#b91c1c}
 .live-table-wrap{overflow:auto;max-height:560px}
 .live-table{width:100%;border-collapse:collapse;min-width:500px}
 .live-table th,.live-table td{padding:8px 6px;border-bottom:1px solid #edf2f7;font-size:11px;text-align:center}
@@ -1485,7 +1551,7 @@ body.player-mode .badge.orange{
  min-height:280px!important;
  padding:30px!important;
  border-radius:24px!important;
- background-color:#061426!important;
+ background-color:#090909!important;
  background-repeat:no-repeat!important;
  background-size:cover!important;
  background-position:center 50%!important;
@@ -1563,24 +1629,75 @@ body.player-mode .badge.orange{
 }
 
 
+/* v131 - cleaner Admin > Players layout on phones */
+.player-mobile-summary{display:none}
+@media(max-width:700px){
+  .player-list-row.status-line{
+    grid-template-columns:minmax(0,1fr) auto !important;
+    gap:6px 10px !important;
+    padding:11px 12px !important;
+    align-items:center !important;
+  }
+  .player-list-row.status-line .player-list-name{
+    grid-column:1 !important;
+    grid-row:1 !important;
+    font-size:15px !important;
+    line-height:1.2 !important;
+  }
+  .player-list-row.status-line .player-status-actions{
+    display:none !important;
+  }
+  .player-mobile-summary{
+    display:block !important;
+    grid-column:1/-1 !important;
+    grid-row:2 !important;
+    min-width:0;
+    font-size:11px;
+    line-height:1.35;
+    color:#64748b;
+    white-space:normal;
+  }
+  .player-mobile-summary .mobile-notify-on{color:#166534;font-weight:900}
+  .player-mobile-summary .mobile-notify-off{color:#991b1b;font-weight:900}
+  .player-mobile-summary .mobile-notify-warn{color:#92400e;font-weight:900}
+  .player-mobile-summary .mobile-good{color:#166534;font-weight:900}
+  .player-mobile-summary .mobile-warn{color:#92400e;font-weight:900}
+  .player-mobile-summary .mobile-bad{color:#991b1b;font-weight:900}
+  .player-list-row.status-line .player-edit-button{
+    grid-column:2 !important;
+    grid-row:1 !important;
+    justify-self:end !important;
+    align-self:center !important;
+    min-width:52px !important;
+    padding:7px 10px !important;
+    font-size:11px !important;
+  }
+  .player-list-row.status-line .player-edit-panel{
+    grid-column:1/-1 !important;
+    grid-row:3 !important;
+    margin-top:4px !important;
+  }
+}
+
+
 /* v117 Admin Random Team Draw */
 .random-draw-layout{display:grid;grid-template-columns:210px 1fr;gap:22px;align-items:center}
 .random-wheel-wrap{display:flex;align-items:center;justify-content:center}
 .random-team-wheel{
  width:190px;height:190px;border-radius:50%;
- background:conic-gradient(#f97316 0 12.5%,#0f2747 12.5% 25%,#f59e0b 25% 37.5%,#16324f 37.5% 50%,#fb923c 50% 62.5%,#102f55 62.5% 75%,#fdba74 75% 87.5%,#071a31 87.5% 100%);
+ background:conic-gradient(#ef233c 0 12.5%,#202020 12.5% 25%,#f59e0b 25% 37.5%,#16324f 37.5% 50%,#ff5a5f 50% 62.5%,#2a2a2a 62.5% 75%,#fdba74 75% 87.5%,#101010 87.5% 100%);
  border:7px solid #fff;outline:3px solid #e2e8f0;box-shadow:0 16px 35px rgba(2,8,23,.2);
  display:flex;align-items:center;justify-content:center;position:relative;
 }
-.random-team-wheel::before{content:"▼";position:absolute;top:-23px;color:#f97316;font-size:25px;z-index:2}
+.random-team-wheel::before{content:"▼";position:absolute;top:-23px;color:#ef233c;font-size:25px;z-index:2}
 .random-wheel-center{
- width:72px;height:72px;border-radius:50%;background:white;border:4px solid #071a31;
- display:flex;align-items:center;justify-content:center;font-weight:1000;color:#071a31;
+ width:72px;height:72px;border-radius:50%;background:white;border:4px solid #101010;
+ display:flex;align-items:center;justify-content:center;font-weight:1000;color:#101010;
  box-shadow:0 8px 22px rgba(0,0,0,.22)
 }
 .random-team-wheel.spinning{animation:seah-wheel-spin 2.2s cubic-bezier(.12,.65,.16,1) forwards}
 @keyframes seah-wheel-spin{from{transform:rotate(0deg)}to{transform:rotate(2520deg)}}
-.random-draw-winner{font-size:25px;font-weight:1000;color:#f97316}
+.random-draw-winner{font-size:25px;font-weight:1000;color:#ef233c}
 .random-draw-history{display:flex;flex-direction:column;gap:7px}
 .random-draw-history-row{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
 @media(max-width:700px){
@@ -1594,12 +1711,12 @@ body.player-mode .badge.orange{
 /* v118 Admin Tools / rollover preview */
 .rollover-ranking-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
 .rollover-rank-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:center}
-.rollover-rank-number{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:1000;background:#0f2747;color:white}
+.rollover-rank-number{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:1000;background:#202020;color:white}
 .rollover-preview-list{display:flex;flex-direction:column;gap:8px}
 .rollover-preview-row{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#f8fafc}
 @media(max-width:700px){.rollover-ranking-grid{grid-template-columns:1fr}}
 
-.rollover-frozen-team{min-height:42px;display:flex;align-items:center;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;font-weight:900;color:#0f2747}
+.rollover-frozen-team{min-height:42px;display:flex;align-items:center;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;font-weight:900;color:#202020}
 
 /* v124 compact collapsible Team Restrictions */
 .team-restrictions-wrap{
@@ -1729,9 +1846,9 @@ body.player-mode .badge.orange{
  color:#334155;
 }
 .team-restriction-item.banned{
- background:#fff7ed;
- color:#9a3412;
- border:1px solid #fed7aa;
+ background:#fff1f2;
+ color:#9f1239;
+ border:1px solid #fecdd3;
 }
 .team-restrictions-empty{
  font-size:10px;
@@ -1796,6 +1913,26 @@ body.player-mode .badge.orange{
  transform:none!important;
 }
 
+
+/* v132 - keep notification nudge visible in the compact mobile status row */
+@media(max-width:700px){
+  .player-mobile-summary{
+    white-space:nowrap !important;
+    overflow-x:auto;
+    overflow-y:hidden;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .player-mobile-summary::-webkit-scrollbar{display:none}
+  .player-mobile-summary .mobile-inline-nudge{
+    display:inline-block !important;
+    margin:0 2px 0 4px !important;
+    padding:4px 6px !important;
+    font-size:9px !important;
+    vertical-align:middle;
+  }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- v123: approved rollover entrants stay paid/alive after sync -->
@@ -1856,7 +1993,7 @@ body.player-mode .badge.orange{
 
 <div id="playerPollModal" style="display:none;position:fixed;inset:0;background:rgba(2,8,23,.78);align-items:center;justify-content:center;padding:18px;z-index:110">
   <div class="poll-shell">
-    <div class="kicker" style="color:#f97316;margin-bottom:6px">PLAYER POLL</div>
+    <div class="kicker" style="color:#ef233c;margin-bottom:6px">PLAYER POLL</div>
     <h3 class="poll-title">We want your opinion</h3>
     <div id="playerPollQuestion" class="poll-question"></div>
     <div id="playerPollOptions"></div>
@@ -3310,65 +3447,9 @@ function dashboard(){
     <div class="action-pro" onclick="notifyMissingPicks()"><div class="icon-wrap small">${appIcon('bell')}</div><div><strong>Missing Picks</strong><span>Send pick reminder</span>${recipientLine('missing')}</div></div>
     <div class="action-pro" onclick="notifyWinner()"><div class="icon-wrap small">${appIcon('trophy')}</div><div><strong>Winner</strong><span>Send announcement</span>${recipientLine('winner')}</div></div>
     <div class="action-pro" onclick="notifyRollover()"><div class="icon-wrap small">${appIcon('repeat')}</div><div><strong>Rollover</strong><span>Send announcement</span>${recipientLine('rollover')}</div></div>
-    <div class="action-pro" onclick="openMassSmsComposer()"><div class="icon-wrap small">${appIcon('mail')}</div><div><strong>Text All Players</strong><span>Open a mass SMS in Google Messages</span></div></div>
    </div>
   </div>
  </div>`;
-}
-
-function normaliseSmsNumber(value){
- const raw=String(value||"").trim();
- if(!raw)return "";
- let n=raw.replace(/[^0-9+]/g,"");
- if(n.startsWith("0044"))n="+44"+n.slice(4);
- else if(n.startsWith("44")&&!n.startsWith("+"))n="+"+n;
- else if(n.startsWith("0"))n="+44"+n.slice(1);
- return /^\+?[0-9]{7,15}$/.test(n)?n:"";
-}
-function massSmsPlayers(){
- const seen=new Set(), valid=[], missing=[];
- (state.players||[]).forEach(p=>{
-  if(!p||p.adminPlayer||p.role==="admin")return;
-  const num=normaliseSmsNumber(p.contactNumber||p.contact_number||"");
-  if(!num){missing.push(p.name||p.username||"Unknown player");return;}
-  if(seen.has(num))return;
-  seen.add(num); valid.push({name:p.name||p.username||num,number:num});
- });
- return {valid,missing};
-}
-function closeMassSmsComposer(){
- const el=document.getElementById("massSmsModal");
- if(el)el.remove();
-}
-function openMassSmsComposer(){
- if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- const {valid,missing}=massSmsPlayers();
- if(!valid.length)return toast("No player phone numbers are stored in LMS yet.");
- closeMassSmsComposer();
- const overlay=document.createElement("div");
- overlay.id="massSmsModal";
- overlay.style.cssText="position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px";
- const missingHtml=missing.length?`<div style="margin-top:12px;padding:10px 12px;border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;color:#9a3412;font-size:12px;line-height:1.45"><strong>${missing.length} player${missing.length===1?"":"s"} without a stored number:</strong><br>${missing.map(escapeHtml).join(", ")}<br><span style="color:#7c2d12">Add these few manually from your phone contacts in Google Messages before sending.</span></div>`:"";
- overlay.innerHTML=`<div style="width:min(620px,100%);max-height:90vh;overflow:auto;background:white;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4)">
-  <div style="font-size:22px;font-weight:1000;color:#0f172a">📱 Text All Players</div>
-  <div style="margin-top:6px;color:#64748b;font-size:13px;line-height:1.45"><strong>${valid.length}</strong> stored player number${valid.length===1?"":"s"} will be loaded into your phone's messaging app.</div>
-  ${missingHtml}
-  <div style="margin-top:16px"><label>Message</label><textarea id="massSmsMessage" rows="7" placeholder="Type your announcement here...">⚽ SeAH Wind LMS Competition ${Number(state.competition||1)+1} is starting!\n\nOpen the LMS for the latest competition information and make sure you're ready to enter and make your pick.\n\nGood luck!</textarea></div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button style="flex:1;min-width:210px" onclick="launchMassSms()">📱 Open Google Messages</button><button class="secondary" onclick="closeMassSmsComposer()">Cancel</button></div>
-  <div style="margin-top:10px;color:#64748b;font-size:11px;line-height:1.4">Google Messages will handle the actual SMS. Check the recipients before pressing Send. Your LMS does not send or read the texts itself.</div>
- </div>`;
- document.body.appendChild(overlay);
- overlay.onclick=e=>{if(e.target===overlay)closeMassSmsComposer();};
-}
-function launchMassSms(){
- const {valid}=massSmsPlayers();
- if(!valid.length)return toast("No player phone numbers are available.");
- const box=document.getElementById("massSmsMessage");
- const message=String(box?.value||"").trim();
- if(!message)return toast("Write your message first.");
- const recipients=valid.map(x=>x.number).join(",");
- const uri="sms:"+recipients+"?body="+encodeURIComponent(message);
- window.location.href=uri;
 }
 
 function playerNotificationStatus(p){
@@ -3421,7 +3502,7 @@ async function checkNotificationSetupNudge(forceChoice=false){
    <div style="font-size:23px;font-weight:950;color:#0f172a;margin-bottom:10px">Stay updated with your competition</div>
    <div style="color:#475569;line-height:1.55;margin-bottom:12px">Get notified when your payment is confirmed, your pick wins or loses, and when you need to make your next pick.</div>
    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;color:#64748b;font-size:12px;line-height:1.4;margin-bottom:18px">Choose an option to continue. You can change your notification preference later in Settings.</div>
-   <div id="notificationChoiceError" style="display:none;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
+   <div id="notificationChoiceError" style="display:none;background:#fff1f2;border:1px solid #fdba74;color:#9f1239;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
    <div style="display:flex;gap:10px;flex-wrap:wrap">
     <button id="nudgeEnableBtn" style="flex:1;min-width:210px;font-weight:950">🔔 Keep me updated</button>
     <button id="nudgeDeclineBtn" class="secondary" style="flex:0 1 135px;min-width:120px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0">No thanks</button>
@@ -3569,11 +3650,13 @@ function players(){
          <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
          <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
        </div>
+       ${(()=>{const ns=playerNotificationStatus(p);const notifyClass=ns.label.includes("ON")?'mobile-notify-on':ns.label.includes("OFF")?'mobile-notify-off':'mobile-notify-warn';const notifyText=ns.label.includes("ON")?'🔔 Notifications on':ns.label.includes("OFF")?'🔕 Notifications off':'⚠ Notifications not set up';return `<div class="player-mobile-summary"><span class="${notifyClass}">${notifyText}</span> · <span class="${p.paid?'mobile-good':'mobile-warn'}">${p.paid?'Paid':'Unpaid'}</span> · <span class="${p.alive?'mobile-good':'mobile-bad'}">${p.alive?'Alive':'Dead'}</span> · <span class="${p.pick?'mobile-good':'mobile-warn'}">${p.pick?'Picked':'No Pick'}</span></div>`})()}
        <button class="small edit-only player-edit-button" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Login username:</strong> ${escapeHtml(p.username||"Not available")}</div>
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Display name:</strong> ${escapeHtml(p.name||"Not available")}</div>
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Contact:</strong> ${escapeHtml(p.contactNumber||"Not provided")}</div>
+         ${(()=>{const ns=playerNotificationStatus(p);return `<div style="width:100%;font-size:12px;color:#475569;margin-bottom:4px"><strong>Notifications:</strong> ${escapeHtml(ns.label.replace(/^🔔\s*|^🔕\s*|^⚠️?\s*/,''))}</div>${ns.label.includes("NOT SET UP")?`<button class="small yellow" onclick="nudgeNotificationSetup(${i})">Nudge Notifications</button>`:""}`})()}
          <button class="small ${p.paid?'yellow':'green'}" onclick="togglePaid(${i})">${p.paid?'Mark Unpaid':'Mark Paid'}</button>
          <button class="small ${p.alive?'red':'green'}" onclick="toggleAlive(${i})">${p.alive?'Mark Dead':'Mark Alive'}</button>
          <button class="small ghost" onclick="unlockPick(${i})">Unlock Pick</button>
@@ -4534,7 +4617,7 @@ function myPick(){
  if(isQueuedForNextCompetition(p))return `${announcementCard}<div class="card"><div class="card-head"><strong>Waiting for Next Competition</strong></div><div class="card-body"><div class="notice">Your account has been approved, but this competition has already started. You will be able to join from Competition #${Number(state.competition||1)+1}. You cannot submit picks for the current competition.</div></div></div>`;
  return `${announcementCard}${buyBackCard}<div class="player-top">
   <div>
-   <div class="kicker">Player Dashboard</div>
+   <div class="kicker">Competition ${Number(state.competition||1)}</div>
    <h2>Round ${state.round}</h2>
    <div class="hero-sub">Deadline: ${escapeHtml(deadlineDisplay())}</div>
   </div>
