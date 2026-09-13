@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SeAH Wind LMS</title>
-<!-- v134 Competition 2 black + red theme -->
+<!-- v135 Competition 2 black + royal blood-red theme + Nudge only inside Edit -->
 <!-- v128 Competition 2 visual refresh -->
 <!-- v133 compact mobile players + notification nudge inside Edit -->
 <!-- v122 cumulative rollover ban calculation -->
@@ -1914,24 +1914,39 @@ body.player-mode .badge.orange{
 }
 
 
-/* v132 - keep notification nudge visible in the compact mobile status row */
-@media(max-width:700px){
-  .player-mobile-summary{
-    white-space:nowrap !important;
-    overflow-x:auto;
-    overflow-y:hidden;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-  }
-  .player-mobile-summary::-webkit-scrollbar{display:none}
-  .player-mobile-summary .mobile-inline-nudge{
-    display:inline-block !important;
-    margin:0 2px 0 4px !important;
-    padding:4px 6px !important;
-    font-size:9px !important;
-    vertical-align:middle;
-  }
+
+/* v135 Competition 2 theme polish: true black/charcoal + deep royal/blood red */
+:root{
+  --navy:#090909!important;--navy2:#111111!important;--navy3:#1b1b1b!important;
+  --orange:#9b111e!important;--orange2:#700c14!important;--red:#9b111e!important;
 }
+body{background:linear-gradient(135deg,#090909,#111 58%,#050505)!important}
+.sidebar,.admin-sidebar{background:linear-gradient(180deg,#111,#070707)!important}
+.mode-switch button.active,.nav button.active,.install-button,.login-tabs button.active,
+button:not(.yellow):not(.green):not(.ghost):not(.secondary):not(.rules-format-btn){
+  background:linear-gradient(135deg,#a31321,#7d0d17)!important;color:#fff!important;
+  box-shadow:0 10px 24px rgba(155,17,30,.22)!important;
+}
+button:not(.yellow):not(.green):not(.ghost):not(.secondary):not(.rules-format-btn):hover{
+  background:linear-gradient(135deg,#8e0f1b,#650a11)!important;
+}
+/* Keep functional warning/payment badges amber; competition branding itself is never orange. */
+.badge.orange{background:#f7e7e9!important;color:#8b0f1a!important}
+.comp-header{background:linear-gradient(135deg,#a31321,#700c14)!important;color:#fff!important}
+.logo{background:linear-gradient(135deg,#a31321,#700c14)!important;color:#fff!important;box-shadow:0 16px 36px rgba(155,17,30,.28)!important}
+.sidebar.player-mode .profile{background:linear-gradient(135deg,#a31321,#700c14)!important;color:#fff!important}
+/* Remove leftover navy-blue icon tiles throughout the admin/player dashboards. */
+.icon-wrap,.icon-wrap.navy,.admin-hero .icon-wrap.navy,.admin-mini-stat .icon-wrap,
+.stat-icon,.metric-icon,.action-icon{
+  background:#191919!important;border-color:#3a3a3a!important;color:#b7192a!important;
+}
+.icon-wrap svg,.stat-icon svg,.metric-icon svg,.action-icon svg{color:#b7192a!important;stroke:currentColor!important}
+.hero-num.orange,.accent,.red-accent{color:#a31321!important}
+input:focus,select:focus,textarea:focus{border-color:#9b111e!important;box-shadow:0 0 0 4px rgba(155,17,30,.14)!important}
+.notice,.admin-alert{border-color:#d8a1a7!important}
+/* Nudge is deliberately only available after opening Edit. */
+.player-status-actions .notification-nudge{display:none!important}
+.player-edit-panel .yellow{background:#9b111e!important;color:#fff!important}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3645,7 +3660,7 @@ function players(){
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
        <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="player-status-actions">
-         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="notification-nudge" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
+         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>`})()}
          <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
          <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
          <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
