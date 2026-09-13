@@ -3667,12 +3667,12 @@ function players(){
      ${approved.length?approved.map(p=>{const i=state.players.indexOf(p);return `<div class="player-list-row status-line">
        <div class="player-list-name" title="${escapeAttr(displayName(p))}">${displayNameHtml(p)}</div>
        <div class="player-status-actions">
-         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>${ns.label.includes("NOT SET UP")?`<button class="notification-nudge" onclick="nudgeNotificationSetup(${i})">Nudge</button>`:""}`})()}
+         ${(()=>{const ns=playerNotificationStatus(p);return `<span class="badge ${ns.cls} notification-badge" title="${escapeAttr(ns.detail)}">${ns.label}</span>`})()}
          <span class="badge ${p.paid?'green':'yellow'}">${p.paid?'Paid':'Unpaid'}</span>
          <span class="badge ${p.alive?'green':'red'}">${p.alive?'Alive':'Dead'}</span>
          <span class="badge ${p.pick?'green':'yellow'}">${p.pick?'Picked':'No Pick'}</span>
        </div>
-       ${(()=>{const ns=playerNotificationStatus(p);const notifyClass=ns.label.includes("ON")?'mobile-notify-on':ns.label.includes("OFF")?'mobile-notify-off':'mobile-notify-warn';const notifyText=ns.label.includes("ON")?'🔔 Notifications on':ns.label.includes("OFF")?'🔕 Notifications off':'⚠ Notifications not set up';return `<div class="player-mobile-summary"><span class="${notifyClass}">${notifyText}</span> · <span class="${p.paid?'mobile-good':'mobile-warn'}">${p.paid?'Paid':'Unpaid'}</span> · <span class="${p.alive?'mobile-good':'mobile-bad'}">${p.alive?'Alive':'Dead'}</span> · <span class="${p.pick?'mobile-good':'mobile-warn'}">${p.pick?'Picked':'No Pick'}</span></div>`})()}
+       ${(()=>{const ns=playerNotificationStatus(p);const notifyClass=ns.label.includes("ON")?'mobile-notify-on':ns.label.includes("OFF")?'mobile-notify-off':'mobile-notify-warn';return `<div class="player-mobile-summary"><span class="${notifyClass}">${escapeHtml(ns.label)}</span> · <span class="${p.paid?'mobile-good':'mobile-warn'}">${p.paid?'Paid':'Unpaid'}</span> · <span class="${p.alive?'mobile-good':'mobile-bad'}">${p.alive?'Alive':'Dead'}</span> · <span class="${p.pick?'mobile-good':'mobile-warn'}">${p.pick?'Picked':'No Pick'}</span></div>`})()}
        <button class="small edit-only player-edit-button" onclick="toggleEditPanel(${i})">Edit</button>
        <div id="edit-${i}" class="player-edit-panel">
          <div style="width:100%;font-size:12px;color:#475569;margin-bottom:2px"><strong>Login username:</strong> ${escapeHtml(p.username||"Not available")}</div>
