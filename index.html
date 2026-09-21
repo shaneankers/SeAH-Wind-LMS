@@ -1937,7 +1937,9 @@ body.player-mode .badge.orange{
 
 
 /* Collapsible administrator settings */
-.settings-accordion{margin-bottom:14px;overflow:hidden}
+.settings-accordion{margin-bottom:14px;overflow:hidden;width:100%;grid-column:1/-1;min-width:0;display:block}
+.settings-accordion:not([open])>.card-body{display:none}
+.settings-accordion>summary.card-head{width:100%;box-sizing:border-box}
 .settings-accordion>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none}
 .settings-accordion>summary::-webkit-details-marker,.team-restrictions-panel>summary::-webkit-details-marker{display:none}
 .settings-accordion>summary::after{content:"▾";margin-left:auto;padding-left:12px;color:#0891b2;font-size:20px}
@@ -4164,15 +4166,22 @@ function adminTools(){
  <div class="card"><div class="card-head"><strong>Buy-Back Rule</strong><span class="badge dark">Original competition only</span></div><div class="card-body"><div class="notice"><strong>Buy-backs are disabled in every rollover.</strong><br>The only buy-back window is after a Round 1 elimination in the original competition (Rollover 0), before the Round 2 deadline.</div></div></div>`;
 }
 
+function ukIsoToInput(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return "";const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(d).reduce((o,p)=>(o[p.type]=p.value,o),{});return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;}
 async function delayCurrentRound(){
  if(!authUser||authUser.role!=="admin"||!supabaseClient)return toast("Admin access and database connection required.");
  const value=document.getElementById("roundDelayDeadline")?.value;
  const message=(document.getElementById("roundDelayReason")?.value||"").trim();
+ const returnValue=document.getElementById("roundDelayReturn")?.value;
+ if(!returnValue)return toast("Choose when the delay should end.");
+ const returnAt=ukLocalDeadlineToISO(returnValue);
+ if(!returnAt)return toast("Enter a valid return date and time (UK time).");
+ if(Date.parse(returnAt)<=Date.now())return toast("The return date must be in the future.");
  if(!value||!message)return toast("Enter a new deadline and a reason.");
  // datetime-local is interpreted in the device timezone; convert explicitly from UK time.
  const date=ukLocalDeadlineToISO(value);
  if(!date)return toast("Enter a valid UK date and time.");
  if(Date.parse(date)<=Date.now())return toast("The new deadline must be in the future.");
+ if(Date.parse(returnAt)>=Date.parse(date))return toast("The delay must end before the new pick deadline.");
  if(!confirm("Delay Round "+state.round+" until "+value.replace("T"," ")+" UK time? Existing picks will not change."))return;
  const oldDeadline=state.deadlineAt,oldLabel=state.deadline,oldDelay=state.notifications?.roundDelay;
  try{
@@ -4180,7 +4189,7 @@ async function delayCurrentRound(){
   if(result.error)throw result.error;
   state.deadlineAt=date;
   state.deadline=deadlineDisplay();
-  state.notifications={...(state.notifications||{}),roundDelay:{active:true,competition:state.competition,rollover:state.rollover||0,round:state.round,message}};
+  state.notifications={...(state.notifications||{}),roundDelay:{active:true,competition:state.competition,rollover:state.rollover||0,round:state.round,message,returnAt}};
   await dbSaveSettings();
   localStorage.setItem(storeKey,JSON.stringify(state));render();toast("Round delayed. Players can make their picks early.");
  }catch(e){
@@ -4695,7 +4704,7 @@ function deadlineInputValue(){
 let delayedPickScreenOpen=false;
 function openDelayedPickScreen(){const p=currentPlayer();if(!roundIsDelayed()||!p||p.locked||p.pick)return;delayedPickScreenOpen=true;window.tempPick="";render();}
 function cancelDelayedPickScreen(){delayedPickScreenOpen=false;window.tempPick="";window.tempLeague="";render();}
-function roundIsDelayed(){const d=state.notifications?.roundDelay;return !!(d&&d.active&&Number(d.competition)===Number(state.competition)&&Number(d.round)===Number(state.round)&&Number(d.rollover||0)===Number(state.rollover||0));}
+function roundIsDelayed(){const d=state.notifications?.roundDelay;return !!(d&&d.active&&(!d.returnAt||Date.now()<Date.parse(d.returnAt))&&Number(d.competition)===Number(state.competition)&&Number(d.round)===Number(state.round)&&Number(d.rollover||0)===Number(state.rollover||0));}
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  const closed=pickingClosed();
@@ -5749,7 +5758,7 @@ function settings(){
  <h3>Picking deadline</h3><div class="formrow"><div><label>Deadline label</label><input id="deadline" value="${escapeAttr(state.deadline||"")}"></div><div><label>Exact deadline (UK time)</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div></div>
  <div class="actions"><button onclick="saveRoundDeadline()">Save Deadline</button></div>
  <hr><h3>Delay this round</h3><div class="tiny">Choose a new deadline and explain the delay. Players without a pick can still pick early.</div>
- <div class="formrow"><div><label>New deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div>
+ <div class="formrow"><div><label>New pick deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Automatically end delay on (UK time)</label><input id="roundDelayReturn" type="datetime-local" value="${escapeAttr(state.notifications?.roundDelay?.returnAt?ukIsoToInput(state.notifications.roundDelay.returnAt):'')}"></div></div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"><div class="tiny">The Delayed label ends automatically on the return date. Picking stays open until the new pick deadline.</div>
  <div class="actions"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div>
  <hr><details class="team-restrictions-panel"><summary class="team-restrictions-button">Block Leagues/Teams <span aria-hidden="true">▾</span></summary><div class="team-restrictions-content"><h3>Team availability — Round ${state.round}</h3><div class="tiny">Switch off leagues or individual teams for this round. Existing submitted picks are not changed. Restrictions are checked again when a player submits.</div>
  ${leagueKeys().map(league=>`<div class="card" style="margin-top:12px"><div class="card-body"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-block-league="${escapeAttr(league)}" ${roundBlockedLeagues().includes(league)?'checked':''}> Block ${escapeHtml(league)}</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">${sortTextList(state.leagues[league]).map(team=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-block-team="${escapeAttr(team)}" ${roundBlockedTeams().includes(team)?'checked':''}>${escapeHtml(team)}</label>`).join('')}</div></div></div>`).join('')}
@@ -5758,7 +5767,7 @@ function settings(){
 
  <details class="card settings-accordion"><summary class="card-head"><strong>Manual Pot Adjustment</strong></summary><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></details>
 
- <details class="card settings-accordion"><summary class="card-head"><strong>Announcements & Disclaimer</strong></div><div class="card-body notification-editor">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Announcements & Disclaimer</strong></summary><div class="card-body notification-editor">
   <div><label>Player dashboard announcement</label><textarea id="announcementText" rows="4" placeholder="Example: Competition delayed until next weekend.">${escapeHtml(state.announcement||"")}</textarea><div class="tiny">Shown above the player dashboard round card. When this text changes, players will see it again even if they dismissed the previous one.</div></div>
   <div><label>Disclaimer</label><textarea id="disclaimerText" rows="5">${escapeHtml(state.disclaimer||"")}</textarea><div class="tiny">Shown on the login page and the player Rules page.</div></div>
   <button onclick="saveAnnouncementAndDisclaimer()">Save Announcement & Disclaimer</button>
@@ -5777,7 +5786,7 @@ function settings(){
   <div class="tiny" style="margin-top:8px">Placeholders: {entryFee}, {round}, {competition}, {player}, {team}</div>
  </div></details>
 
- <details class="card settings-accordion"><summary class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Notification Messages</strong></summary><div class="card-body notification-editor">
   <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${escapeHtml(noteTextRaw('unpaid'))}</textarea></div>
   <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${escapeHtml(noteTextRaw('missingPick'))}</textarea></div>
   <div><label>Winner announcement</label><textarea id="noteWinner" rows="3">${escapeHtml(noteTextRaw('winner'))}</textarea></div>
@@ -5808,7 +5817,7 @@ function settings(){
   <div class="tiny" style="margin-top:10px">No API key or paid subscription required. Scores are cached for 2 minutes and tables for 10 minutes.</div>
  </div></details>
 
- <details class="card settings-accordion"><summary class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></summary><div class="card-body team-manager">
   ${leagueKeys().map(league=>`<div class="league-box">
    <div class="league-head"><strong>${escapeHtml(league)}</strong><span class="badge">${state.leagues[league].length}</span></div>
    <div class="team-chip-list">
@@ -5816,9 +5825,9 @@ function settings(){
    </div>
    <div class="add-team-row"><input id="add-${league.replace(/\s/g,'-')}" placeholder="Add team to ${escapeHtml(league)}"><button class="small" onclick="addTeam('${league.replace(/'/g,"\\'")}')">Add</button></div>
   </div>`).join("")}
- </div></div>
+ </div></details>
 
- <div class="card factory-reset-card"><div class="card-head"><strong>Factory Reset</strong></summary><div class="card-body">
+ <details class="card settings-accordion factory-reset-card"><summary class="card-head"><strong>Factory Reset</strong></summary><div class="card-body">
   <div class="factory-reset-desc">Deletes all players, picks, payments, activity logs and competition history. The administrator account and settings will be kept.</div>
   <button class="red" onclick="factoryResetKeepAdmin()">Factory Reset (Keep Admin)</button>
  </div></details>`;
