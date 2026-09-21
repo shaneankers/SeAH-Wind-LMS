@@ -1935,6 +1935,17 @@ body.player-mode .badge.orange{
   }
 }
 
+
+/* Collapsible administrator settings */
+.settings-accordion{margin-bottom:14px;overflow:hidden}
+.settings-accordion>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none}
+.settings-accordion>summary::-webkit-details-marker,.team-restrictions-panel>summary::-webkit-details-marker{display:none}
+.settings-accordion>summary::after{content:"▾";margin-left:auto;padding-left:12px;color:#0891b2;font-size:20px}
+.settings-accordion[open]>summary::after{content:"▴"}
+.settings-accordion>summary:focus-visible,.team-restrictions-panel>summary:focus-visible{outline:3px solid #06b6d4;outline-offset:-3px}
+.team-restrictions-button{display:inline-flex;gap:14px;align-items:center;background:#0891b2;color:white;padding:12px 18px;border-radius:12px;font-weight:700;cursor:pointer;list-style:none}
+.team-restrictions-panel[open]>.team-restrictions-button span{transform:rotate(180deg)}
+.team-restrictions-content{margin-top:14px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- v123: approved rollover entrants stay paid/alive after sync -->
@@ -5698,18 +5709,18 @@ function manualCopy(){
 function settings(){
  ensureLeagues();
  const adminUsername=(authUser&&authUser.username)||state.adminUsername||"";
- return `<div class="card"><div class="card-head"><strong>Admin Account</strong></div><div class="card-body">
+ return `<details class="card settings-accordion"><summary class="card-head"><strong>Admin Account</strong></summary><div class="card-body">
   <label>Username</label><input id="adminUsername" value="${escapeHtml(adminUsername)}">
   <label style="margin-top:12px">Password</label><input id="adminPassword" type="password" value="">
   <br><br><button onclick="saveAdminAccount()">Save Admin Login</button>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Join Code</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Join Code</strong></summary><div class="card-body">
   <div class="item"><div><div class="item-title">${escapeHtml(state.joinCode||"")}</div><div class="tiny">Players need this code to create an account</div></div><button class="small yellow" onclick="changeJoinCode()">Change</button></div>
   <br><button onclick="copyInvite()">Copy Invite Message</button>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Admin Contact Details</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Admin Contact Details</strong></summary><div class="card-body">
   <div class="formrow">
    <div><label>Name</label><input id="contactName" value="${escapeAttr(ensureContactDetails().name)}" placeholder="Example: Shane"></div>
    <div><label>Contact number</label><input id="contactPhone" value="${escapeAttr(ensureContactDetails().phone)}" placeholder="Example: 07...">
@@ -5717,9 +5728,9 @@ function settings(){
   </div>
   <label>Message shown to players</label><textarea id="contactMessage" rows="3" placeholder="If you have any issues with the competition, payments, picks or the app, please contact the administrator directly.">${escapeHtml(ensureContactDetails().message||"If you have any issues with the competition, payments, picks or the app, please contact the administrator directly.")}</textarea>
   <br><br><button onclick="saveContactDetails()">Save Contact Details</button>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Player Payment Details</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Player Payment Details</strong></summary><div class="card-body">
   <div class="formrow">
    <div><label>Account name</label><input id="paymentAccountName" value="${escapeAttr(ensurePaymentDetails().accountName||"")}"></div>
    <div><label>Sort code</label><input id="paymentSortCode" value="${escapeAttr(ensurePaymentDetails().sortCode||"")}"></div>
@@ -5727,33 +5738,33 @@ function settings(){
   <label>Account number</label><input id="paymentAccountNumber" value="${escapeAttr(ensurePaymentDetails().accountNumber||"")}">
   <label style="margin-top:12px">Payment message</label><textarea id="paymentMessage" rows="3">${escapeHtml(ensurePaymentDetails().message||"Please use your full name as the payment reference so your payment can be identified correctly.")}</textarea>
   <br><br><button onclick="savePaymentDetails()">Save Payment Details</button>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Competition Rules</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Competition Rules</strong></summary><div class="card-body">
  <label>Entry fee (£)</label><input id="entryFee" type="number" min="0" value="${escapeAttr(state.entryFee)}">
  <label>Rules</label><div class="rules-editor-toolbar"><button type="button" class="rules-format-btn" onclick="boldRulesSelection()"><strong>B</strong></button><span class="tiny">Highlight text, then press B to make it bold.</span></div>
  <textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea><br><br><button onclick="saveSettings()">Save Rules</button>
- </div></div>
- <div class="card"><div class="card-head"><strong>Round Settings</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body">
+ </div></details>
+ <details class="card settings-accordion"><summary class="card-head"><strong>Round Settings</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></summary><div class="card-body">
  <h3>Picking deadline</h3><div class="formrow"><div><label>Deadline label</label><input id="deadline" value="${escapeAttr(state.deadline||"")}"></div><div><label>Exact deadline (UK time)</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div></div>
  <div class="actions"><button onclick="saveRoundDeadline()">Save Deadline</button></div>
  <hr><h3>Delay this round</h3><div class="tiny">Choose a new deadline and explain the delay. Players without a pick can still pick early.</div>
  <div class="formrow"><div><label>New deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div>
  <div class="actions"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div>
- <hr><h3>Team availability — Round ${state.round}</h3><div class="tiny">Switch off leagues or individual teams for this round. Existing submitted picks are not changed. Restrictions are checked again when a player submits.</div>
+ <hr><details class="team-restrictions-panel"><summary class="team-restrictions-button">Block Leagues/Teams <span aria-hidden="true">▾</span></summary><div class="team-restrictions-content"><h3>Team availability — Round ${state.round}</h3><div class="tiny">Switch off leagues or individual teams for this round. Existing submitted picks are not changed. Restrictions are checked again when a player submits.</div>
  ${leagueKeys().map(league=>`<div class="card" style="margin-top:12px"><div class="card-body"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-block-league="${escapeAttr(league)}" ${roundBlockedLeagues().includes(league)?'checked':''}> Block ${escapeHtml(league)}</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">${sortTextList(state.leagues[league]).map(team=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-block-team="${escapeAttr(team)}" ${roundBlockedTeams().includes(team)?'checked':''}>${escapeHtml(team)}</label>`).join('')}</div></div></div>`).join('')}
- <div class="actions"><button onclick="saveRoundTeamRestrictions()">Save Team Restrictions</button></div>
- </div></div>
+ <div class="actions"><button onclick="saveRoundTeamRestrictions()">Save Team Restrictions</button></div></div></details>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Manual Pot Adjustment</strong></div><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></div>
+ <details class="card settings-accordion"><summary class="card-head"><strong>Manual Pot Adjustment</strong></summary><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></details>
 
- <div class="card"><div class="card-head"><strong>Announcements & Disclaimer</strong></div><div class="card-body notification-editor">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Announcements & Disclaimer</strong></div><div class="card-body notification-editor">
   <div><label>Player dashboard announcement</label><textarea id="announcementText" rows="4" placeholder="Example: Competition delayed until next weekend.">${escapeHtml(state.announcement||"")}</textarea><div class="tiny">Shown above the player dashboard round card. When this text changes, players will see it again even if they dismissed the previous one.</div></div>
   <div><label>Disclaimer</label><textarea id="disclaimerText" rows="5">${escapeHtml(state.disclaimer||"")}</textarea><div class="tiny">Shown on the login page and the player Rules page.</div></div>
   <button onclick="saveAnnouncementAndDisclaimer()">Save Announcement & Disclaimer</button>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Automatic Player Notifications</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Automatic Player Notifications</strong></summary><div class="card-body">
   <div class="tiny" style="margin-bottom:10px">These trigger automatically after a successful status change. Untick any notification you do not want sent.</div>
   <div class="auto-note-list">
    ${Object.entries(ensureAutomaticNotifications()).map(([key,item])=>`<div class="auto-note-row">
@@ -5764,9 +5775,9 @@ function settings(){
   </div>
   <div class="actions" style="margin-top:12px"><button onclick="saveAutomaticNotificationSettings()">Save Automatic Notifications</button></div>
   <div class="tiny" style="margin-top:8px">Placeholders: {entryFee}, {round}, {competition}, {player}, {team}</div>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Notification Messages</strong></div><div class="card-body notification-editor">
   <div><label>Payment reminder</label><textarea id="noteUnpaid" rows="3">${escapeHtml(noteTextRaw('unpaid'))}</textarea></div>
   <div><label>Pick reminder</label><textarea id="noteMissing" rows="3">${escapeHtml(noteTextRaw('missingPick'))}</textarea></div>
   <div><label>Winner announcement</label><textarea id="noteWinner" rows="3">${escapeHtml(noteTextRaw('winner'))}</textarea></div>
@@ -5774,10 +5785,10 @@ function settings(){
   <button onclick="saveNotificationMessages()">Save Notification Messages</button>
   <button class="ghost" onclick="togglePlaceholders()">ⓘ Available placeholders</button>
   <div id="placeholderBox" class="placeholder-box notice">{entryFee}, {round}, {deadline}, {competition}, {winner}</div>
- </div></div>
+ </div></details>
 
 
- <div class="card"><div class="card-head"><strong>Player Polls</strong><span class="badge orange">${adminPoll?.active?"Active":"Feedback"}</span></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Player Polls</strong><span class="badge orange">${adminPoll?.active?"Active":"Feedback"}</span></summary><div class="card-body">
   <div class="notice" style="margin-bottom:14px">Publish a short poll for players. It appears as a popup when they open the app and each player can vote once.</div>
   <label>Question</label>
   <input id="pollQuestion" placeholder="Example: Would you rather the entry fee be £5 or £10?">
@@ -5790,14 +5801,14 @@ function settings(){
    <button class="ghost" onclick="loadAdminPollData(true)">Refresh Results</button>
   </div>
   <div style="margin-top:18px"><label>Current / latest poll</label>${renderAdminPollResults()}</div>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Live Football</strong></div><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Live Football</strong></summary><div class="card-body">
   <div class="item"><div><div class="item-title">ESPN Football Data</div><div class="tiny">Premier League, Championship, League One and League Two scores/tables via ESPN football data.</div></div><button class="small ghost" onclick="setPage('liveFootball')">Open</button></div>
   <div class="tiny" style="margin-top:10px">No API key or paid subscription required. Scores are cached for 2 minutes and tables for 10 minutes.</div>
- </div></div>
+ </div></details>
 
- <div class="card"><div class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Team Manager</strong><span class="badge orange">${state.teams.length} teams</span></div><div class="card-body team-manager">
   ${leagueKeys().map(league=>`<div class="league-box">
    <div class="league-head"><strong>${escapeHtml(league)}</strong><span class="badge">${state.leagues[league].length}</span></div>
    <div class="team-chip-list">
@@ -5807,10 +5818,10 @@ function settings(){
   </div>`).join("")}
  </div></div>
 
- <div class="card factory-reset-card"><div class="card-head"><strong>Factory Reset</strong></div><div class="card-body">
+ <div class="card factory-reset-card"><div class="card-head"><strong>Factory Reset</strong></summary><div class="card-body">
   <div class="factory-reset-desc">Deletes all players, picks, payments, activity logs and competition history. The administrator account and settings will be kept.</div>
   <button class="red" onclick="factoryResetKeepAdmin()">Factory Reset (Keep Admin)</button>
- </div></div>`;
+ </div></details>`;
 }
 
 function togglePlaceholders(){
