@@ -2852,7 +2852,14 @@ function switchAdminView(view){
  render();
 }
 function navItems(){return role==="admin"?[["dashboard","🏠 Dashboard"],["players","👥 Players"],["round","⚽ Round"],["tools","🎛️ Tools"],["settings","⚙️ Settings"]]:[["myPick","🏠 Dashboard"],["latestNews","📰 Latest News"],["liveFootball","⚽ Live Football"],["previous","📋 Previous Picks"],["competition","🏆 Competition"],["statistics","📊 Statistics & Records"],["playerHall","🏅 Hall of Fame"],["rules","📖 Rules"],["playerSettings","⚙️ Settings"]]}
+let announcementDraftInProgress=false;
+document.addEventListener("input",event=>{
+ if(event.target&&["announcementText","disclaimerText"].includes(event.target.id))announcementDraftInProgress=true;
+});
 function render(){
+ // Keep the announcement editor mounted while an unsaved draft exists.
+ // Background Supabase refreshes still update state without erasing the typed text.
+ if(role==="admin"&&page==="settings"&&announcementDraftInProgress&&document.getElementById("announcementText"))return;
  chooseHeaderPhoto(false);
  document.body.classList.toggle("player-mode",role==="player");
  document.body.classList.toggle("admin-mode",role==="admin");
@@ -6828,10 +6835,12 @@ async function saveAnnouncementAndDisclaimer(){
  try{
   await dbSaveSettings();
   await loadAppSettingsFromSupabase();
+  announcementDraftInProgress=false;
   toast("Announcement and disclaimer saved.");
  }catch(e){
   console.error("Announcement/disclaimer save failed",e);
   toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
+  return; // Keep the unsaved editor visible for another attempt.
  }
  render();
 }
