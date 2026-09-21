@@ -4201,7 +4201,7 @@ async function endRoundDelay(){
 function round(){
  const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
  return `
- <div class="card"><div class="card-head"><strong>Round Delay</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body"><div class="tiny">Set a new UK pick deadline. Players without a submitted pick can choose Make My Pick Now or wait. Existing picks are untouched.</div><div class="formrow" style="margin-top:12px"><div><label>New pick deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div><div class="actions" style="margin-top:12px"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div></div></div>
+
  <div class="card">
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
@@ -5735,6 +5735,7 @@ function settings(){
    <div><label>Deadline label</label><input id="deadline" value="${escapeHtml(state.deadline||"")}" placeholder="Example: Friday 17:00"></div>
     <div><label>Exact pick cut-off</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"><div class="tiny">Players are automatically blocked at this exact UK date and time.</div></div>
   </div>
+
   <label>Rules</label>
   <div class="rules-editor-toolbar">
    <button type="button" class="rules-format-btn" onclick="boldRulesSelection()" title="Make selected rules text bold"><strong>B</strong></button>
@@ -5743,6 +5744,8 @@ function settings(){
   <textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
   <br><br><button onclick="saveSettings()">Save Rules</button>
  </div></div>
+
+ <div class="card"><div class="card-head"><strong>Round Delay</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body"><div class="tiny">Set a new UK pick deadline. Players without a submitted pick can choose Make My Pick Now or wait. Existing picks are untouched.</div><div class="formrow" style="margin-top:12px"><div><label>New pick deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div><div class="actions" style="margin-top:12px"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div></div></div>
 
  <div class="card"><div class="card-head"><strong>Manual Pot Adjustment</strong></div><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></div>
 
