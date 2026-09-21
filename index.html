@@ -4725,7 +4725,7 @@ function myPick(){
   ${delayed&&p.pick?`<div class="notice">Your pick has been submitted: <strong>${escapeHtml(p.pick)}</strong>.</div>`:""}
   ${showDelayedPicker&&!p.locked?`<div class="pick-grid">
    <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${controlsDisabled?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
-   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const previouslyUsed=p.previous.includes(t)&&p.pick!==t;const rolloverBanned=playerRolloverBans(p).includes(t)&&p.pick!==t;const blocked=previouslyUsed||rolloverBanned;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${blocked?'disabled':''}>${escapeHtml(t)}${previouslyUsed?' (used)':rolloverBanned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
+   <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const previouslyUsed=p.previous.includes(t)&&p.pick!==t;const rolloverBanned=playerRolloverBans(p).includes(t)&&p.pick!==t;const roundBlocked=isRoundTeamBlocked(t);const blocked=previouslyUsed||rolloverBanned||roundBlocked;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${blocked?'disabled':''}>${escapeHtml(t)}${previouslyUsed?' (used)':rolloverBanned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
   </div>
   ${((Array.isArray(p.previous)&&p.previous.length)||playerRolloverBans(p).length)?`<div class="team-restrictions-wrap">
    <div class="team-restrictions-entry">
@@ -5730,22 +5730,20 @@ function settings(){
  </div></div>
 
  <div class="card"><div class="card-head"><strong>Competition Rules</strong></div><div class="card-body">
-  <div class="formrow">
-   <div><label>Entry fee</label><input id="entryFee" type="number" value="${escapeHtml(state.entryFee)}"></div>
-   <div><label>Deadline label</label><input id="deadline" value="${escapeHtml(state.deadline||"")}" placeholder="Example: Friday 17:00"></div>
-    <div><label>Exact pick cut-off</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"><div class="tiny">Players are automatically blocked at this exact UK date and time.</div></div>
-  </div>
-
-  <label>Rules</label>
-  <div class="rules-editor-toolbar">
-   <button type="button" class="rules-format-btn" onclick="boldRulesSelection()" title="Make selected rules text bold"><strong>B</strong></button>
-   <span class="tiny">Highlight text, then press B to make it bold.</span>
-  </div>
-  <textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea>
-  <br><br><button onclick="saveSettings()">Save Rules</button>
+ <label>Entry fee (£)</label><input id="entryFee" type="number" min="0" value="${escapeAttr(state.entryFee)}">
+ <label>Rules</label><div class="rules-editor-toolbar"><button type="button" class="rules-format-btn" onclick="boldRulesSelection()"><strong>B</strong></button><span class="tiny">Highlight text, then press B to make it bold.</span></div>
+ <textarea id="rulesText" rows="10">${escapeHtml(state.rules||"")}</textarea><br><br><button onclick="saveSettings()">Save Rules</button>
  </div></div>
-
- <div class="card"><div class="card-head"><strong>Round Delay</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body"><div class="tiny">Set a new UK pick deadline. Players without a submitted pick can choose Make My Pick Now or wait. Existing picks are untouched.</div><div class="formrow" style="margin-top:12px"><div><label>New pick deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div><div class="actions" style="margin-top:12px"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div></div></div>
+ <div class="card"><div class="card-head"><strong>Round Settings</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body">
+ <h3>Picking deadline</h3><div class="formrow"><div><label>Deadline label</label><input id="deadline" value="${escapeAttr(state.deadline||"")}"></div><div><label>Exact deadline (UK time)</label><input id="deadlineAt" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div></div>
+ <div class="actions"><button onclick="saveRoundDeadline()">Save Deadline</button></div>
+ <hr><h3>Delay this round</h3><div class="tiny">Choose a new deadline and explain the delay. Players without a pick can still pick early.</div>
+ <div class="formrow"><div><label>New deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div>
+ <div class="actions"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div>
+ <hr><h3>Team availability — Round ${state.round}</h3><div class="tiny">Switch off leagues or individual teams for this round. Existing submitted picks are not changed. Restrictions are checked again when a player submits.</div>
+ ${leagueKeys().map(league=>`<div class="card" style="margin-top:12px"><div class="card-body"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-block-league="${escapeAttr(league)}" ${roundBlockedLeagues().includes(league)?'checked':''}> Block ${escapeHtml(league)}</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">${sortTextList(state.leagues[league]).map(team=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox" data-block-team="${escapeAttr(team)}" ${roundBlockedTeams().includes(team)?'checked':''}>${escapeHtml(team)}</label>`).join('')}</div></div></div>`).join('')}
+ <div class="actions"><button onclick="saveRoundTeamRestrictions()">Save Team Restrictions</button></div>
+ </div></div>
 
  <div class="card"><div class="card-head"><strong>Manual Pot Adjustment</strong></div><div class="card-body"><label>Adjustment amount (£)</label><input id="manualPotAdjustment" type="number" step="0.01" value="${escapeAttr(Number(state.manualPotAdjustment||0).toFixed(2))}"><div class="tiny" style="margin-top:8px">Use this only for money outside standard paid-player entries. Approved buy-backs are added automatically.</div><div class="actions" style="margin-top:12px"><button onclick="saveManualPotAdjustment()">Save Pot Adjustment</button></div></div></div>
 
@@ -6264,7 +6262,7 @@ async function setResult(i,v){
  }
 }
 
-function chooseTempPick(v){window.tempPick=v;render()}
+function chooseTempPick(v){if(v&&isRoundTeamBlocked(v))return toast("That team is unavailable this round.");window.tempPick=v;render()}
 async function confirmPlayerPick(){
  const p=currentPlayer();
  const pick=(window.tempPick||"").trim();
@@ -6272,6 +6270,7 @@ async function confirmPlayerPick(){
  if(!p||!p.id)return toast("Could not identify the logged-in player.");
  if(pickingClosed())return toast("The deadline has passed. Picking is closed for this round.");
  if(!pick)return toast("Choose a team first.");
+ if(isRoundTeamBlocked(pick))return toast("That team is unavailable this round. Choose another team.");
  if(!confirm(`Confirm ${pick} as your pick? Once submitted, you cannot change it unless the admin unlocks it.`))return;
 
  try{
@@ -6744,43 +6743,40 @@ function normaliseNumber(value,fallback){
 
 async function saveSettings(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
- const feeEl=document.getElementById("entryFee");
- const deadlineEl=document.getElementById("deadline");
- const deadlineAtEl=document.getElementById("deadlineAt");
- const rulesEl=document.getElementById("rulesText");
- if(!feeEl||!deadlineEl||!deadlineAtEl||!rulesEl)return toast("Settings form not loaded. Refresh and try again.");
- const fee=normaliseNumber(feeEl.value,state.entryFee||5);
- const deadline=(deadlineEl.value||"").trim();
- const deadlineLocal=(deadlineAtEl.value||"").trim();
- const rules=(rulesEl.value||"").trim();
- if(!fee||fee<0)return toast("Enter a valid entry fee.");
- if(!deadline)return toast("Enter a deadline label.");
- if(!deadlineLocal)return toast("Set the exact pick cut-off date and time.");
- if(!rules)return toast("Enter the rules text.");
- const parsedDeadline=new Date(deadlineLocal);
- if(!Number.isFinite(parsedDeadline.getTime()))return toast("Enter a valid exact deadline.");
- state.entryFee=fee;
- state.deadline=deadline;
- state.deadlineAt=parsedDeadline.toISOString();
- state.rules=rules;
- localStorage.setItem(storeKey,JSON.stringify(state));
- toast("Saving rules...");
- try{
-  await dbSaveSettings();
-  const deadlineSave=await supabaseClient.rpc("set_pick_deadline",{
-   p_admin_user_id:authUser.user_id,
-   p_deadline_at:state.deadlineAt
-  });
-  if(deadlineSave.error)throw deadlineSave.error;
-  await loadAppSettingsFromSupabase();
-  toast("Rules and competition settings saved.");
- }catch(e){
-  console.error("Settings save failed",e);
-  toast("Saved on this device, but database save failed: "+(e.message||"check Supabase policies"));
- }
- render();
+ const fee=Number(document.getElementById("entryFee")?.value),rules=(document.getElementById("rulesText")?.value||"").trim();
+ if(!Number.isFinite(fee)||fee<0||!rules)return toast("Enter a valid entry fee and rules.");
+ const previous={fee:state.entryFee,rules:state.rules};state.entryFee=fee;state.rules=rules;
+ try{await dbSaveSettings();localStorage.setItem(storeKey,JSON.stringify(state));render();toast("Competition rules saved.");}
+ catch(e){state.entryFee=previous.fee;state.rules=previous.rules;render();toast("Rules not saved: "+(e.message||"database error"));}
 }
-
+async function saveRoundDeadline(){
+ if(!authUser||authUser.role!=="admin"||!supabaseClient)return toast("Admin connection required.");
+ const value=document.getElementById("deadlineAt")?.value;
+ const date=ukLocalDeadlineToISO(value||"");if(!date)return toast("Enter a valid UK deadline.");
+ if(Date.parse(date)<=Date.now())return toast("Deadline must be in the future.");
+ const label=(document.getElementById("deadline")?.value||"").trim();
+ if(!confirm("Change the current round pick deadline to "+value.replace("T"," ")+" UK time?"))return;
+ const previous={deadline:state.deadline,deadlineAt:state.deadlineAt};
+ try{const result=await supabaseClient.rpc("set_pick_deadline",{p_admin_user_id:authUser.user_id,p_deadline_at:date});if(result.error)throw result.error;
+ state.deadlineAt=date;state.deadline=label||deadlineDisplay();await dbSaveSettings();localStorage.setItem(storeKey,JSON.stringify(state));render();toast("New deadline saved.");}
+ catch(e){await loadAppSettingsFromSupabase();render();toast("Check deadline: "+(e.message||"database error"));}
+}
+function roundRestrictionRecord(){
+ const r=state.notifications?.roundTeamRestrictions;
+ return r&&Number(r.competition)===Number(state.competition)&&Number(r.rollover||0)===Number(state.rollover||0)&&Number(r.round)===Number(state.round)?r:null;
+}
+function roundBlockedLeagues(){return roundRestrictionRecord()?.leagues||[];}
+function roundBlockedTeams(){return roundRestrictionRecord()?.teams||[];}
+function isRoundTeamBlocked(team){return roundBlockedTeams().includes(team)||roundBlockedLeagues().includes(teamLeague(team));}
+async function saveRoundTeamRestrictions(){
+ if(!authUser||authUser.role!=="admin")return toast("Admin only.");
+ const leagues=[...document.querySelectorAll('[data-block-league]:checked')].map(e=>e.getAttribute('data-block-league'));
+ const teams=[...document.querySelectorAll('[data-block-team]:checked')].map(e=>e.getAttribute('data-block-team'));
+ const old=state.notifications?.roundTeamRestrictions;
+ state.notifications={...(state.notifications||{}),roundTeamRestrictions:{competition:state.competition,rollover:state.rollover||0,round:state.round,leagues,teams}};
+ try{await dbSaveSettings();localStorage.setItem(storeKey,JSON.stringify(state));render();toast("Round team restrictions saved.");}
+ catch(e){state.notifications.roundTeamRestrictions=old;render();toast("Restrictions not saved: "+(e.message||"database error"));}
+}
 async function saveContactDetails(){
  if(!authUser||authUser.role!=="admin")return toast("Admin only.");
  const nameEl=document.getElementById("contactName");
