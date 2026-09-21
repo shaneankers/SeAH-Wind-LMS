@@ -5739,7 +5739,7 @@ function settings(){
   <br><br><button onclick="saveContactDetails()">Save Contact Details</button>
  </div></details>
 
- <details class="card settings-accordion"><summary class="card-head"><strong>Player Payment Details</strong></summary><div class="card-body">
+ <details class="card settings-accordion"><summary class="card-head"><strong>Admin Payment Details</strong></summary><div class="card-body">
   <div class="formrow">
    <div><label>Account name</label><input id="paymentAccountName" value="${escapeAttr(ensurePaymentDetails().accountName||"")}"></div>
    <div><label>Sort code</label><input id="paymentSortCode" value="${escapeAttr(ensurePaymentDetails().sortCode||"")}"></div>
@@ -7681,7 +7681,9 @@ async function refreshSharedState(){
    entryFee:state.entryFee,announcement:state.announcement,announcementVersion:state.announcementVersion,
    rules:state.rules,disclaimer:state.disclaimer,activityLog:state.activityLog,adminAlerts:state.adminAlerts,players:state.players
   });
-  if(old!==next)render();
+  // Keep the entire admin Settings screen mounted during background sync.
+  // Rebuilding it would close accordions and discard unsaved form edits.
+  if(old!==next && !(role==="admin" && page==="settings"))render();
   if(authUser&&authUser.role!=="admin")await checkNotificationSetupNudge(false);
  }finally{
   sharedRefreshBusy=false;
