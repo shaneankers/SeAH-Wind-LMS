@@ -4152,9 +4152,56 @@ function adminTools(){
 
  <div class="card"><div class="card-head"><strong>Buy-Back Rule</strong><span class="badge dark">Original competition only</span></div><div class="card-body"><div class="notice"><strong>Buy-backs are disabled in every rollover.</strong><br>The only buy-back window is after a Round 1 elimination in the original competition (Rollover 0), before the Round 2 deadline.</div></div></div>`;
 }
+
+async function delayCurrentRound(){
+ if(!authUser||authUser.role!=="admin"||!supabaseClient)return toast("Admin access and database connection required.");
+ const value=document.getElementById("roundDelayDeadline")?.value;
+ const message=(document.getElementById("roundDelayReason")?.value||"").trim();
+ if(!value||!message)return toast("Enter a new deadline and a reason.");
+ // datetime-local is interpreted in the device timezone; convert explicitly from UK time.
+ const date=ukLocalDeadlineToISO(value);
+ if(!date)return toast("Enter a valid UK date and time.");
+ if(Date.parse(date)<=Date.now())return toast("The new deadline must be in the future.");
+ if(!confirm("Delay Round "+state.round+" until "+value.replace("T"," ")+" UK time? Existing picks will not change."))return;
+ const oldDeadline=state.deadlineAt,oldLabel=state.deadline,oldDelay=state.notifications?.roundDelay;
+ try{
+  const result=await supabaseClient.rpc("set_pick_deadline",{p_admin_user_id:authUser.user_id,p_deadline_at:date});
+  if(result.error)throw result.error;
+  state.deadlineAt=date;
+  state.deadline=deadlineDisplay();
+  state.notifications={...(state.notifications||{}),roundDelay:{active:true,competition:state.competition,rollover:state.rollover||0,round:state.round,message}};
+  await dbSaveSettings();
+  localStorage.setItem(storeKey,JSON.stringify(state));render();toast("Round delayed. Players can make their picks early.");
+ }catch(e){
+  // The deadline RPC may already have succeeded; never pretend the operation was rolled back.
+  console.error("Delay save failed",e);
+  await loadAppSettingsFromSupabase();render();toast("Delay not fully saved. Check the deadline and try again: "+(e.message||"database error"));
+ }
+}
+function ukLocalDeadlineToISO(value){
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return null;
+ const target=value.replace("T"," ");
+ const base=Date.parse(value+":00Z");if(!Number.isFinite(base))return null;
+ const formatter=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+ for(const offset of [-120,-60,0,60,120]){
+  const d=new Date(base+offset*60000),parts=formatter.formatToParts(d).reduce((o,p)=>(o[p.type]=p.value,o),{});
+  if(`${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`===target)return d.toISOString();
+ }
+ return null;
+}
+async function endRoundDelay(){
+ if(!authUser||authUser.role!=="admin"||!roundIsDelayed())return;
+ if(!confirm("Remove the delayed label? The current pick deadline will stay unchanged."))return;
+ const old=state.notifications.roundDelay;
+ state.notifications.roundDelay={...old,active:false};
+ try{await dbSaveSettings();localStorage.setItem(storeKey,JSON.stringify(state));render();toast("Delay label removed. Deadline unchanged.");}
+ catch(e){state.notifications.roundDelay=old;render();toast("Could not save: "+(e.message||"database error"));}
+}
+
 function round(){
  const roundPlayers=alive().filter(p=>p.result!=="waiting_next_round");
  return `
+ <div class="card"><div class="card-head"><strong>Round Delay</strong><span class="badge ${roundIsDelayed()?'yellow':'green'}">${roundIsDelayed()?'Delayed':'Normal'}</span></div><div class="card-body"><div class="tiny">Set a new UK pick deadline. Players without a submitted pick can choose Make My Pick Now or wait. Existing picks are untouched.</div><div class="formrow" style="margin-top:12px"><div><label>New pick deadline (UK time)</label><input id="roundDelayDeadline" type="datetime-local" value="${escapeAttr(deadlineInputValue())}"></div><div><label>Reason shown to players</label><input id="roundDelayReason" value="${escapeAttr(state.notifications?.roundDelay?.message||'Round postponed.')}"></div></div><div class="actions" style="margin-top:12px"><button onclick="delayCurrentRound()">Delay Round</button>${roundIsDelayed()?`<button class="secondary" onclick="endRoundDelay()">End Delay Label</button>`:''}</div></div></div>
  <div class="card">
    <div class="card-head"><strong>Round ${state.round}</strong><span class="badge yellow round-deadline-badge">${state.deadline}</span></div>
    <div class="card-body list">
@@ -4634,9 +4681,15 @@ function deadlineInputValue(){
  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
+let delayedPickScreenOpen=false;
+function openDelayedPickScreen(){const p=currentPlayer();if(!roundIsDelayed()||!p||p.locked||p.pick)return;delayedPickScreenOpen=true;window.tempPick="";render();}
+function cancelDelayedPickScreen(){delayedPickScreenOpen=false;window.tempPick="";window.tempLeague="";render();}
+function roundIsDelayed(){const d=state.notifications?.roundDelay;return !!(d&&d.active&&Number(d.competition)===Number(state.competition)&&Number(d.round)===Number(state.round)&&Number(d.rollover||0)===Number(state.rollover||0));}
 function myPick(){
  const p=currentPlayer(),selected=window.tempPick||p.pick||"";
  const closed=pickingClosed();
+ const delayed=roundIsDelayed();
+ const showDelayedPicker=!delayed||delayedPickScreenOpen;
  const controlsDisabled=p.locked||!p.alive||!p.paid||closed;
  if(!p.approved)return `<div class="card"><div class="card-head"><strong>Account Pending</strong></div><div class="card-body"><div class="notice">Your account has been created and is awaiting admin approval.</div>${pendingNotificationPermissionBlock()}</div></div>`;
  const buyBackCard=buyBackPlayerCard(p);
@@ -4653,7 +4706,7 @@ function myPick(){
   <div class="player-current">
    <div class="kicker">Current Pick</div>
    <div class="hero-num">${escapeHtml(p.pick||"No team selected")}</div>
-   <div class="hero-sub">${p.pick?'Submitted':closed?'Picking closed':'Awaiting selection'}</div>
+   <div class="hero-sub">${p.pick?'Submitted':closed?'Picking closed':delayed?'Round delayed':'Awaiting selection'}</div>
   </div>
  </div>
 
@@ -4664,10 +4717,13 @@ function myPick(){
   <div class="player-stat"><div class="icon-wrap navy small">${appIcon('ball')}</div><div><div class="num">${p.pick?'Yes':'No'}</div><div class="lbl">Pick Submitted</div></div></div>
  </div>
 
- <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge ${closed?'red':'orange'}">Round ${state.round}${closed?' · Closed':''}</span></div><div class="card-body">
+ <div class="card"><div class="card-head"><strong>My Pick</strong><span class="badge ${closed?'red':delayed?'yellow':'orange'}">Round ${state.round}${closed?' · Closed':delayed?' · Delayed':''}</span></div><div class="card-body">
   ${closed?`<div class="notice" style="margin-bottom:12px"><strong>Picking is closed for this round.</strong><br>The deadline passed at ${escapeHtml(deadlineDisplay())}. The administrator will assign a random available team if you did not submit in time.</div>`:""}
+  ${delayed?`<div class="notice" style="margin-bottom:12px"><strong>Round ${state.round} has been delayed.</strong><br>${escapeHtml(state.notifications?.roundDelay?.message||"The round has been postponed.")}<br>New pick deadline: ${escapeHtml(deadlineDisplay())}.</div>`:""}
   ${!p.paid?`<div class="notice" style="margin-bottom:12px">You cannot submit a pick until your payment has been marked as paid.</div>`:""}
-  <div class="pick-grid">
+  ${delayed&&!p.pick&&!p.locked&&!closed&&!delayedPickScreenOpen?`<button type="button" class="install-button" onclick="openDelayedPickScreen()" ${!p.alive||!p.paid?'disabled':''}>Make My Pick Now</button>`:""}
+  ${delayed&&p.pick?`<div class="notice">Your pick has been submitted: <strong>${escapeHtml(p.pick)}</strong>.</div>`:""}
+  ${showDelayedPicker&&!p.locked?`<div class="pick-grid">
    <div><label>Select League</label><select onchange="selectPickLeague(this.value)" ${controlsDisabled?'disabled':''}>${leagueKeys().map(l=>`<option value="${escapeAttr(l)}" ${(window.tempLeague||teamLeague(selected))===l?'selected':''}>${escapeHtml(l)}</option>`).join("")}</select></div>
    <div><label>Select Team</label><select onchange="chooseTempPick(this.value)" ${controlsDisabled?'disabled':''}><option value="">Choose team...</option>${sortTextList(state.leagues[window.tempLeague||teamLeague(selected)]).map(t=>{const previouslyUsed=p.previous.includes(t)&&p.pick!==t;const rolloverBanned=playerRolloverBans(p).includes(t)&&p.pick!==t;const blocked=previouslyUsed||rolloverBanned;return `<option value="${escapeAttr(t)}" ${selected===t?'selected':''} ${blocked?'disabled':''}>${escapeHtml(t)}${previouslyUsed?' (used)':rolloverBanned?' (rollover restricted)':''}</option>`}).join("")}</select></div>
   </div>
@@ -4698,6 +4754,8 @@ function myPick(){
   </div>`:""}
   ${p.locked?`<div class="notice locked-pick-notice">Your pick is locked for this round.</div>`:""}
   <button class="install-button pick-confirm-button ${p.locked?'confirmed-btn':''}" onclick="${p.locked||closed?'':'confirmPlayerPick()'}" ${controlsDisabled?'disabled':''}>${p.locked?'✓ Confirmed':closed?'Picking Closed':'Confirm Pick'}</button>
+  ${delayed?`<button type="button" class="secondary" onclick="cancelDelayedPickScreen()">Cancel / Back</button>`:""}
+  `:""}
  </div></div>`;
 }
 function toggleTeamRestrictionsPanel(){
@@ -6233,6 +6291,7 @@ async function confirmPlayerPick(){
   p.alive=saved.alive!==false;
   p.result=saved.result||"pending";
   window.tempPick="";
+  delayedPickScreenOpen=false;
 
   addActivity("pick",p.name+" picked "+p.pick,"Round "+state.round+" pick submitted");
   localStorage.setItem(storeKey,JSON.stringify(state));
